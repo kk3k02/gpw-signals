@@ -7,7 +7,7 @@ from gpw_signals.ingest.rss_portals import parse_feed
 from gpw_signals.mapping import TickerMap
 from gpw_signals.market.regime import Regime
 from gpw_signals.models import Assessment, Levels, SourceKind
-from gpw_signals.scoring import score_signal
+from gpw_signals.scoring import pre_agent_check, score_signal
 from tests.test_levels import _snap
 
 RSS = """<?xml version="1.0" encoding="UTF-8"?>
@@ -74,3 +74,29 @@ def test_score_rejects(fcfg):
     assert any("SMA50" in x for x in r.rejections)
     r = score_signal(_a(), _snap(), LV, Regime.BULL, SourceKind.ESPI, fcfg, earnings_soon=True)
     assert any("wyniki" in x for x in r.rejections)
+
+
+def test_pre_agent_check_never_drops_a_passing_signal(fcfg):
+    """Spójność: jeśli pełna ocena by przepuściła sygnał, filtr przed agentem też musi go przepuścić."""
+    import itertools
+    checked = 0
+    for close, vol_ratio, change, regime, kind, strength, min_score in itertools.product(
+            [90, 100], [0.5, 2.0], [1.0, 9.0], list(Regime), list(SourceKind),
+            [0.3, 0.8, 1.0], [0.4, 0.55, 0.8]):
+        fcfg.min_score = min_score
+        snap = _snap(close=close, volume_ratio=vol_ratio, change_pct=change)
+        full = score_signal(_a(strength=strength), snap, LV, regime, kind, fcfg)
+        if full.passed:
+            checked += 1
+            assert pre_agent_check(snap, LV, regime, kind, fcfg) == [], (close, regime, kind, strength)
+    assert checked > 0
+
+
+def test_pre_agent_check_rejects_without_agent(fcfg):
+    assert pre_agent_check(_snap(avg_turnover_20=1e5), LV, Regime.BULL, SourceKind.ESPI, fcfg)
+    assert pre_agent_check(_snap(change_pct=9), LV, Regime.BULL, SourceKind.ESPI, fcfg)
+    fcfg.min_score = 0.95
+    rej = pre_agent_check(_snap(volume_ratio=0.5), LV, Regime.BEAR, SourceKind.MACRO, fcfg)
+    assert rej and "maks. możliwy score" in rej[0]
+    fcfg.min_score = 0.55
+    assert pre_agent_check(_snap(), LV, Regime.BULL, SourceKind.ESPI, fcfg) == []

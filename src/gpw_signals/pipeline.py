@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -26,7 +27,7 @@ from .market.regime import Regime, market_regime
 from .models import NewsItem, Signal, SignalStatus
 from .publish.formatter import format_outcome, format_signal
 from .publish.telegram import DryRunPublisher, Publisher, TelegramPublisher
-from .scoring import score_signal
+from .scoring import pre_agent_check, score_signal
 from .tracker.outcomes import evaluate
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,8 @@ class App:
     assessor: NewsAssessor | None = None
     # Źródło czasu (aware UTC) – podmieniane w testach
     clock: Callable[[], datetime] = field(default=utc_now)
+    # Statystyki ostatniego cyklu: wywołania LLM i decyzje podjęte bez LLM, wg etapu (#5)
+    cycle_stats: Counter = field(default_factory=Counter)
 
     @property
     def tz(self) -> ZoneInfo:
@@ -87,6 +90,7 @@ class App:
     def run_once(self) -> list[Signal]:
         """Jeden cykl. Przetwarza WSZYSTKIE nieprzetworzone newsy z bazy – także zaległe po crashu
         lub błędzie przejściowym – a nie tylko te pobrane w tym cyklu (#1)."""
+        self.cycle_stats = Counter()
         self.publish_pending()
 
         news = fetch_all(self.sources)
@@ -134,6 +138,7 @@ class App:
                 self.db.record_failure(n.uid, f"{type(e).__name__}: {e}", pc.max_attempts)
                 continue
             self.db.mark_news(n.uid, " | ".join(decisions))
+        self._log_cycle_stats()
         return published
 
     def process(self, n: NewsItem, ticker: str, regime: Regime) -> tuple[Signal | None, str]:
@@ -144,7 +149,7 @@ class App:
         if company is None:
             return None, f"{ticker}: nieznany ticker"
         if self.db.has_recent_signal(ticker, self.clock() - timedelta(days=f.cooldown_days)):
-            return None, f"{ticker}: cooldown"
+            return self._skip("cooldown", f"{ticker}: cooldown")
         try:
             df = self.prices.daily(company.stooq_symbol, self.settings.market.history_days)
         except Exception as e:
@@ -153,12 +158,20 @@ class App:
             snap = snapshot(df, self.settings.levels.atr_period,
                             self.settings.levels.swing_window, self.settings.levels.swing_lookback)
         except ValueError as e:
-            return None, f"{ticker}: {e}"
+            return self._skip("historia", f"{ticker}: {e}")
 
-        # Tani pre-filtr przed kosztownym wywołaniem LLM
-        if snap.avg_turnover_20 < f.min_avg_turnover_pln:
-            return None, f"{ticker}: niska płynność"
+        # #5: wszystko, co nie zależy od oceny agenta, sprawdzamy PRZED kosztownym wywołaniem LLM
+        lr = compute_levels(snap, self.settings.levels)
+        if lr.levels is None:
+            return self._skip("poziomy", f"{ticker}: poziomy – {lr.reason}")
+        errors = validate_levels(lr.levels, f.min_rr_t1)
+        if errors:
+            return self._skip("walidacja", f"{ticker}: walidacja – {'; '.join(errors)}")
+        pre = pre_agent_check(snap, lr.levels, regime, n.kind, f)
+        if pre:
+            return self._skip("filtry", f"{ticker}: odrzucony przed agentem – {'; '.join(pre)}")
 
+        self.cycle_stats["llm"] += 1
         try:
             a = self.assessor.assess(n, ticker, company.name)
         except AgentError as e:  # odmowa, przekroczone limity – ponowienie nic nie da
@@ -168,13 +181,6 @@ class App:
             if _is_transient_api_error(e):
                 raise TransientError(f"{ticker}: API Claude ({type(e).__name__}: {e})") from e
             raise
-
-        lr = compute_levels(snap, self.settings.levels)
-        if lr.levels is None:
-            return None, f"{ticker}: poziomy – {lr.reason}"
-        errors = validate_levels(lr.levels, f.min_rr_t1)
-        if errors:
-            return None, f"{ticker}: walidacja – {'; '.join(errors)}"
 
         sr = score_signal(a, snap, lr.levels, regime, n.kind, f,
                           earnings_soon=self.calendar.earnings_within(
@@ -192,6 +198,17 @@ class App:
         if self._publish(sig):
             return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f}"
         return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} – publikacja do ponowienia"
+
+    def _skip(self, stage: str, decision: str) -> tuple[None, str]:
+        """Decyzja podjęta bez wywołania LLM – liczona, żeby było widać oszczędność."""
+        self.cycle_stats[f"bez_llm:{stage}"] += 1
+        return None, decision
+
+    def _log_cycle_stats(self) -> None:
+        st = self.cycle_stats
+        skipped = sum(v for k, v in st.items() if k.startswith("bez_llm:"))
+        detail = ", ".join(f"{k.removeprefix('bez_llm:')}={v}" for k, v in sorted(st.items()) if k != "llm")
+        log.info("Wywołania LLM: %d, decyzje bez LLM: %d%s", st["llm"], skipped, f" ({detail})" if detail else "")
 
     # ---------------------------------------------------------------- publikacja
     def _publish(self, sig: Signal) -> bool:
