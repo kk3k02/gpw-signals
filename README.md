@@ -26,7 +26,9 @@ Tracker po sesji: T1/T2/T3/SL/wygaśnięcie → odpowiedź pod sygnałem + staty
 uv venv; uv pip install -e ".[dev]"
 copy .env.example .env      # uzupełnij klucze
 python -m pytest
-python -m gpw_signals fetch-prices         # notowania z archiwum GPW (pierwszy raz ok. 15 min)
+python -m gpw_signals fetch-prices         # notowania z archiwum GPW (pierwszy raz ok. 20 min)
+python -m gpw_signals build-tickers        # dopisz nowe spółki z archiwum do data/gpw_tickers.csv
+python -m gpw_signals fetch-prices         # ...i ich notowania (z cache, ok. 1 min)
 python -m gpw_signals preview PKN          # poziomy bez LLM
 python -m gpw_signals backtest PKN LPP     # kalibracja silnika poziomów
 python -m gpw_signals once --dry-run       # pełny cykl, druk zamiast wysyłki
@@ -41,7 +43,10 @@ python -m gpw_signals stats
   - ceny są **nieskorygowane** o splity i prawa poboru; spółka ze skokiem kursu > `max_jump_pct` jest pomijana,
   - przed publicznym kanałem sprawdź warunki korzystania z danych GPW (#16). Inne źródło podepniesz, zapisując CSV do `data/prices` albo dopisując własny `PriceProvider`.
 - **Źródła:** zweryfikuj URL-e feedów i regulaminy serwisów w `config/settings.yaml`. Feed `bankier-rekomendacje` zwraca 0 pozycji.
-- **Tickery:** uzupełnij `data/gpw_tickers.csv` o pełną listę spółek.
+- **Lista spółek:** `data/gpw_tickers.csv` obejmuje cały rynek główny (ok. 390 spółek, `build-tickers`). Ręcznie opisane są tylko największe spółki (pełna nazwa, aliasy, sektor). Dla pozostałych tickerem jest nazwa skrócona GPW (np. `POLIMEXMS`). Mapowanie newsów:
+  - komunikat ESPI dotyczy tylko emitenta z tytułu ("EMITENT: temat"), nie kontrahentów z treści,
+  - wiadomości z portali są mapowane tylko po tytule, bo lead często wymienia spółki poboczne,
+  - skróty i nazwy skrócone dopasowujemy tylko WIELKIMI literami; jakość mierzy `tests/test_mapping.py` na oznaczonych tytułach z `tests/fixtures/mapping_cases.yaml`.
 - **Krok notowań:** `market/tick_size.py` to tabela uproszczona. Na GPW krok zależy też od pasma płynności.
 - **Kalendarz:** święta GPW w `settings.yaml` oraz kalendarz wyników w `data/macro_calendar.yaml`.
 - **Prawo:** publiczne sygnały kup/cel/SL to w UE rekomendacje inwestycyjne (MAR art. 20, rozporządzenie 2016/958, nadzór KNF). Przed uruchomieniem publicznego kanału skonsultuj się z prawnikiem.
