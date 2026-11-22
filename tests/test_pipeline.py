@@ -260,21 +260,21 @@ def test_reject_low_liquidity_before_llm(make_app):
     n = _news()
     app = make_app([n])
     app.settings.filters.min_avg_turnover_pln = 1e15
-    assert _decision(app, n) == "PKN: niska płynność" and app.assessor.calls == 0
+    assert "odrzucony przed agentem – płynność" in _decision(app, n) and app.assessor.calls == 0
 
 
 def test_reject_levels(make_app):
     n = _news()
     app = make_app([n])
     app.settings.levels.max_sl_pct = 0.1
-    assert "poziomy – SL za daleko" in _decision(app, n)
+    assert "poziomy – SL za daleko" in _decision(app, n) and app.assessor.calls == 0
 
 
 def test_reject_validation(make_app):
     n = _news()
     app = make_app([n])
     app.settings.filters.min_rr_t1 = 5.0
-    assert "walidacja – R:R" in _decision(app, n)
+    assert "walidacja – R:R" in _decision(app, n) and app.assessor.calls == 0
 
 
 def test_reject_by_agent_and_score(make_app):
@@ -315,3 +315,30 @@ def test_daily_limit_counts_market_day(make_app):
     app.sources[0].items = [b]
     app.clock = lambda: t0 + timedelta(hours=1)  # 00:30 PL, 23.11 – nowy dzień sesyjny, limit od zera
     assert [s.ticker for s in app.run_once()] == ["PKO"]
+
+
+# ------------------------------------------------------------------ #5 filtry przed LLM
+
+def test_reject_gap_before_llm(make_app):
+    n = _news()
+    app = make_app([n])
+    app.settings.filters.max_gap_pct = -100  # każdy ruch to "już wystrzelił"
+    assert "odrzucony przed agentem – kurs już" in _decision(app, n) and app.assessor.calls == 0
+
+
+def test_reject_unreachable_score_before_llm(make_app):
+    n = _news()
+    app = make_app([n])
+    app.settings.filters.min_score = 0.99  # nieosiągalny nawet przy sile katalizatora 1.0
+    assert "maks. możliwy score" in _decision(app, n) and app.assessor.calls == 0
+
+
+def test_cycle_stats_count_llm_calls_and_skips(make_app, caplog):
+    a, b = _news("ORLEN podpisał umowę", age=timedelta(minutes=1)), _news("PKO BP podał wyniki",
+                                                                         age=timedelta(minutes=2))
+    app = make_app([a, b])
+    app.settings.levels.max_sl_pct = 0.1  # obie spółki odpadną na poziomach
+    with caplog.at_level("INFO", logger="gpw_signals.pipeline"):
+        app.run_once()
+    assert app.cycle_stats["llm"] == 0 and app.cycle_stats["bez_llm:poziomy"] == 2
+    assert "Wywołania LLM: 0, decyzje bez LLM: 2 (poziomy=2)" in caplog.text
