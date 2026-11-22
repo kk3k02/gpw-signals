@@ -6,6 +6,7 @@ import httpx2
 import pytest
 
 from gpw_signals.agent.assess import AgentError
+from gpw_signals.clock import to_iso, utc_now
 from gpw_signals.config import FiltersConfig, LevelsConfig, ProcessingConfig, PublishConfig, Settings
 from gpw_signals.db import Database
 from gpw_signals.ingest.macro import EventCalendar
@@ -197,7 +198,7 @@ def test_publish_failure_keeps_signal_and_retries_without_duplicate(make_app):
     [row] = app.db.all_signals()
     assert row["status"] == "pending_publish" and row["telegram_message_id"] is None
     assert _row(app, n)["processed"] == 1  # news rozstrzygnięty – nie wraca do agenta
-    assert app.db.has_recent_signal("PKN", 5)  # cooldown działa od razu
+    assert app.db.has_recent_signal("PKN", utc_now() - timedelta(days=5))  # cooldown działa od razu
     assert app.db.open_signals() == []          # tracker nie śledzi nieopublikowanych
 
     app.run_once()  # kolejny cykl ponawia wysyłkę z bazy
@@ -213,7 +214,7 @@ def test_stale_pending_signal_is_not_sent(make_app):
     app.run_once()
     sid = app.db.all_signals()[0]["id"]
     app.db.conn.execute("UPDATE signals SET created_at=? WHERE id=?",
-                        ((datetime.now() - timedelta(minutes=61)).isoformat(), sid))
+                        (to_iso(utc_now() - timedelta(minutes=61)), sid))
     app.run_once()
     [row] = app.db.all_signals()
     assert row["status"] == "unpublished" and row["closed_at"] is not None
@@ -295,3 +296,22 @@ def test_daily_limit_leaves_rest_in_queue(make_app):
     assert len(app.run_once()) == 1
     leftover = [_row(app, x) for x in (a, b) if _row(app, x)["processed"] == 0]
     assert len(leftover) == 1 and leftover[0]["attempts"] == 0  # czeka, bez zużywania prób
+
+
+# ------------------------------------------------------------------ #11 dzień sesji niezależny od strefy serwera
+
+def test_daily_limit_counts_market_day(make_app):
+    """Sygnał z 00:30 czasu PL liczy się do nowego dnia, choć w UTC to jeszcze poprzedni."""
+    t0 = datetime(2026, 11, 22, 22, 30, tzinfo=UTC)  # 23:30 PL, 22.11
+    a = NewsItem("fake", SourceKind.ESPI, "ORLEN podpisał umowę", "https://ex.pl/a", t0 - timedelta(minutes=5),
+                 "Treść.", priority=3)
+    b = NewsItem("fake", SourceKind.ESPI, "PKO BP podał wyniki", "https://ex.pl/b",
+                 t0 + timedelta(minutes=55), "Treść.", priority=3)
+    app = make_app([a])
+    app.settings.filters.max_signals_per_day = 1
+    app.clock = lambda: t0
+    assert len(app.run_once()) == 1
+
+    app.sources[0].items = [b]
+    app.clock = lambda: t0 + timedelta(hours=1)  # 00:30 PL, 23.11 – nowy dzień sesyjny, limit od zera
+    assert [s.ticker for s in app.run_once()] == ["PKO"]

@@ -5,7 +5,6 @@ import argparse
 import json
 import logging
 import sys
-from datetime import datetime
 
 from .config import load_settings
 
@@ -62,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _preview(app, ticker: str) -> None:
+    from .clock import utc_now
     from .levels.engine import compute_levels
     from .levels.validate import validate_levels
     from .market.indicators import snapshot
@@ -75,7 +75,7 @@ def _preview(app, ticker: str) -> None:
         print("Brak poziomów:", lr.reason)
         return
     a = Assessment(ticker, True, "long", "inne", 0.0, 10, False, "(podgląd – bez oceny agenta)")
-    print(format_signal(Signal(ticker, c.name, lr.levels, 0.0, a, "", datetime.now())))
+    print(format_signal(Signal(ticker, c.name, lr.levels, 0.0, a, "", utc_now())))
     print("Walidacja:", validate_levels(lr.levels, app.settings.filters.min_rr_t1) or "OK")
 
 

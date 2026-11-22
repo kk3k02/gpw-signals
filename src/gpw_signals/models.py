@@ -84,7 +84,7 @@ class Signal:
     score: float
     assessment: Assessment
     news_uid: str
-    created_at: datetime
+    created_at: datetime        # aware, UTC (patrz clock.py)
     status: SignalStatus = SignalStatus.ACTIVE
     id: int | None = None
     telegram_message_id: int | None = None

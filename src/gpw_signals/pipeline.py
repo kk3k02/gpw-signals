@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import anthropic
 
 from .agent.assess import AgentError, NewsAssessor
 from .agent.tools import ToolContext
+from .clock import market_date, market_day_bounds, utc_now
 from .config import Settings
 from .db import Database
 from .ingest.base import Source, fetch_all
@@ -49,6 +52,16 @@ class App:
     sources: list[Source]
     publisher: Publisher
     assessor: NewsAssessor | None = None
+    # Źródło czasu (aware UTC) – podmieniane w testach
+    clock: Callable[[], datetime] = field(default=utc_now)
+
+    @property
+    def tz(self) -> ZoneInfo:
+        return ZoneInfo(self.settings.timezone)
+
+    def signals_today(self) -> int:
+        """Sygnały z bieżącego dnia w strefie rynku – niezależnie od strefy serwera."""
+        return self.db.count_signals_between(*market_day_bounds(market_date(self.clock(), self.tz), self.tz))
 
     # ---------------------------------------------------------------- budowa
     @classmethod
@@ -58,7 +71,7 @@ class App:
         tickers = TickerMap.from_csv(settings.tickers_csv)
         m = settings.market
         prices = make_provider(m.provider, m.stooq_url, m.csv_dir)
-        calendar = EventCalendar(settings.sources.macro_calendar_file)
+        calendar = EventCalendar(settings.sources.macro_calendar_file, ZoneInfo(settings.timezone))
         sources: list[Source] = [RssSource(f, settings.sources.broker_keywords) for f in settings.sources.rss]
         sec = settings.secrets
         if dry_run or not settings.publish.enabled:
@@ -87,7 +100,7 @@ class App:
         regime = self._regime()
         pc = self.settings.processing
         max_age = timedelta(hours=pc.max_news_age_hours)
-        now = datetime.now(UTC)
+        now = self.clock()
         published: list[Signal] = []
         for n in queue:
             if now - n.published_at > max_age:
@@ -96,7 +109,7 @@ class App:
             if not n.tickers:
                 self.db.mark_news(n.uid, "brak tickera")
                 continue
-            if self.db.signals_today() >= self.settings.filters.max_signals_per_day:
+            if self.signals_today() >= self.settings.filters.max_signals_per_day:
                 log.info("Osiągnięto dzienny limit sygnałów – reszta kolejki czeka")
                 break
 
@@ -130,7 +143,7 @@ class App:
         company = self.tickers.get(ticker)
         if company is None:
             return None, f"{ticker}: nieznany ticker"
-        if self.db.has_recent_signal(ticker, f.cooldown_days):
+        if self.db.has_recent_signal(ticker, self.clock() - timedelta(days=f.cooldown_days)):
             return None, f"{ticker}: cooldown"
         try:
             df = self.prices.daily(company.stooq_symbol, self.settings.market.history_days)
@@ -164,7 +177,8 @@ class App:
             return None, f"{ticker}: walidacja – {'; '.join(errors)}"
 
         sr = score_signal(a, snap, lr.levels, regime, n.kind, f,
-                          earnings_soon=self.calendar.earnings_within(ticker))
+                          earnings_soon=self.calendar.earnings_within(
+                              ticker, today=market_date(self.clock(), self.tz)))
         if not sr.passed:
             log.info("%s odrzucony: %s", ticker, sr.rejections)
             return None, f"{ticker}: odrzucony – {'; '.join(sr.rejections)}"
@@ -172,7 +186,7 @@ class App:
         # #2: najpierw zapis (status pending_publish), dopiero potem wysyłka. Dzięki temu sygnał
         # od razu blokuje cooldown, a nieudana wysyłka jest ponawiana z bazy, nie przez ponowną ocenę newsa.
         sig = Signal(ticker=ticker, company_name=company.name, levels=lr.levels, score=sr.score,
-                     assessment=a, news_uid=n.uid, created_at=datetime.now(),
+                     assessment=a, news_uid=n.uid, created_at=self.clock(),
                      status=SignalStatus.PENDING_PUBLISH)
         self.db.insert_signal(sig)
         if self._publish(sig):
@@ -196,9 +210,9 @@ class App:
         limit = timedelta(minutes=self.settings.publish.max_pending_minutes)
         sent = 0
         for s in self.db.pending_signals():
-            if datetime.now() - s.created_at > limit:
+            if self.clock() - s.created_at > limit:
                 log.warning("Sygnał %s (%s) nieopublikowany w %s – porzucony", s.id, s.ticker, limit)
-                self.db.update_signal_status(s.id, SignalStatus.UNPUBLISHED, closed=True)
+                self.db.update_signal_status(s.id, SignalStatus.UNPUBLISHED, closed_at=self.clock())
             elif self._publish(s):
                 sent += 1
         return sent
@@ -219,9 +233,9 @@ class App:
             except Exception as e:  # noqa: BLE001
                 log.warning("Tracker %s: %s", s.ticker, e)
                 continue
-            out = evaluate(s, bars)
+            out = evaluate(s, bars, self.tz)
             if out.status != s.status or out.closed:
                 if out.status != s.status and out.status != SignalStatus.ACTIVE \
                         and self.settings.publish.post_outcomes:
                     self.publisher.send(format_outcome(s, out.status), reply_to=s.telegram_message_id)
-                self.db.update_signal_status(s.id, out.status, closed=out.closed)
+                self.db.update_signal_status(s.id, out.status, closed_at=self.clock() if out.closed else None)
