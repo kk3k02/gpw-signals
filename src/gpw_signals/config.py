@@ -80,8 +80,14 @@ class FiltersConfig(BaseModel):
     min_score: float = 0.55
 
 
+class ProcessingConfig(BaseModel):
+    max_news_age_hours: float = 12.0   # starsze nieprzetworzone newsy uznajemy za nieaktualne
+    max_attempts: int = 3              # ile razy ponawiać news po błędzie przejściowym
+
+
 class PublishConfig(BaseModel):
     enabled: bool = True
+    max_pending_minutes: int = 60      # po tym czasie nieopublikowany sygnał nie jest już wysyłany
     use_test_channel: bool = True
     include_thesis: bool = True
     post_outcomes: bool = True
@@ -98,6 +104,7 @@ class Settings(BaseModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     levels: LevelsConfig = Field(default_factory=LevelsConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
+    processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     publish: PublishConfig = Field(default_factory=PublishConfig)
     secrets: Secrets = Field(default_factory=Secrets)
 
