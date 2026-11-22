@@ -52,8 +52,8 @@ def test_calendar(tmp_path):
 
 
 def _a(**kw):
-    d = dict(ticker="PKN", actionable=True, direction="long", catalyst_type="umowa", strength=0.8,
-             horizon_days=10, already_priced_in=False, thesis="t")
+    d = {"ticker": "PKN", "actionable": True, "direction": "long", "catalyst_type": "umowa", "strength": 0.8,
+             "horizon_days": 10, "already_priced_in": False, "thesis": "t"}
     d.update(kw)
     return Assessment(**d)
 

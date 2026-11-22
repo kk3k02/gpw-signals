@@ -53,16 +53,16 @@ class NewsAssessor:
         return self._client
 
     def _create(self, messages: list[dict]):
-        params = dict(
-            model=self.cfg.model,
-            max_tokens=self.cfg.max_tokens,
+        params = {
+            "model": self.cfg.model,
+            "max_tokens": self.cfg.max_tokens,
             # Stały system prompt + stałe narzędzia => prefiks cache'owalny między newsami
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            tools=TOOL_DEFINITIONS,
-            messages=messages,
-            output_config={"effort": self.cfg.effort,
+            "system": [{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+            "tools": TOOL_DEFINITIONS,
+            "messages": messages,
+            "output_config": {"effort": self.cfg.effort,
                            "format": {"type": "json_schema", "schema": ASSESSMENT_SCHEMA}},
-        )
+        }
         if self.cfg.use_fallbacks:
             # Przy odmowie modelu serwer sam ponawia zapytanie na modelu zapasowym
             return self.client.beta.messages.create(**params, betas=[FALLBACK_BETA], fallbacks="default")

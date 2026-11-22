@@ -36,4 +36,11 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 
 [tool.ruff]
-line-length = 110
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Jawny zestaw reguł – wynik nie zależy od domyślnych ustawień wersji ruffa
+select = ["E", "F", "W", "I", "UP", "B", "BLE", "C4", "RUF"]
+# Półpauza to zamierzona interpunkcja w polskich komunikatach, nie pomyłka
+allowed-confusables = ["–"]

@@ -1,14 +1,14 @@
 """Reżim rynku na podstawie indeksu (domyślnie WIG20)."""
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 import pandas as pd
 
 from .indicators import sma
 
 
-class Regime(str, Enum):
+class Regime(StrEnum):
     BULL = "bull"
     NEUTRAL = "neutral"
     BEAR = "bear"
