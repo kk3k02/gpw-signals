@@ -6,9 +6,9 @@ from gpw_signals.models import Levels
 
 
 def _snap(**kw) -> Snapshot:
-    base = dict(close=100.0, prev_close=99.0, atr=2.0, sma20=98, sma50=95, sma200=90,
-                avg_turnover_20=5e6, volume_ratio=1.5, change_pct=1.0, high_52w=120, low_52w=80,
-                resistances=[], supports=[])
+    base = {"close": 100.0, "prev_close": 99.0, "atr": 2.0, "sma20": 98, "sma50": 95, "sma200": 90,
+                "avg_turnover_20": 5e6, "volume_ratio": 1.5, "change_pct": 1.0, "high_52w": 120, "low_52w": 80,
+                "resistances": [], "supports": []}
     base.update(kw)
     return Snapshot(**base)
 

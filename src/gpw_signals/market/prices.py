@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 import time
 from pathlib import Path
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 import httpx
 import pandas as pd
@@ -20,7 +20,7 @@ class PriceProvider(Protocol):
 
 
 class StooqProvider:
-    _RENAME = {"Data": "date", "Otwarcie": "open", "Najwyzszy": "high", "Najnizszy": "low",
+    _RENAME: ClassVar[dict[str, str]] = {"Data": "date", "Otwarcie": "open", "Najwyzszy": "high", "Najnizszy": "low",
                "Zamkniecie": "close", "Wolumen": "volume",
                "Date": "date", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"}
 

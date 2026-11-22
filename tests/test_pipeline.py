@@ -149,7 +149,9 @@ def test_gives_up_after_max_attempts(make_app):
 
 
 def test_unexpected_error_does_not_stop_cycle(make_app):
-    bad, good = _news("ORLEN zawarł umowę"), _news("PKO BP podał wyniki")
+    # Kolejka idzie od najnowszego newsa – jawne czasy, żeby kolejność nie zależała od rozdzielczości zegara
+    bad = _news("ORLEN zawarł umowę", age=timedelta(minutes=1))
+    good = _news("PKO BP podał wyniki", age=timedelta(minutes=2))
     app = make_app([bad, good], assessor=FakeAssessor(KeyError("bug")))
     sigs = app.run_once()
     assert [s.ticker for s in sigs] == ["PKO"]
@@ -216,3 +218,80 @@ def test_stale_pending_signal_is_not_sent(make_app):
     [row] = app.db.all_signals()
     assert row["status"] == "unpublished" and row["closed_at"] is not None
     assert app.publisher.sent == []
+
+
+# ------------------------------------------------------------------ ścieżki odrzucenia w process()
+
+class ShortPrices(FakePrices):
+    def daily(self, symbol, days=250):
+        return make_ohlcv().tail(10)
+
+
+def _decision(app, news):
+    app.run_once()
+    row = _row(app, news)
+    assert row["processed"] == 1, row["last_error"]
+    return row["decision"]
+
+
+def test_reject_no_ticker(make_app):
+    n = _news("Pogoda na weekend")
+    app = make_app([n])
+    assert _decision(app, n) == "brak tickera" and app.assessor.calls == 0
+
+
+def test_reject_cooldown(make_app):
+    first = _news("ORLEN podpisał umowę", age=timedelta(minutes=1))  # nowszy -> przetwarzany pierwszy
+    second = _news("ORLEN rozszerza współpracę", age=timedelta(minutes=2))
+    app = make_app([first, second])
+    sigs = app.run_once()
+    assert len(sigs) == 1
+    assert _row(app, second)["decision"] == "PKN: cooldown" and app.assessor.calls == 1
+
+
+def test_reject_insufficient_history(make_app):
+    n = _news()
+    app = make_app([n], prices=ShortPrices())
+    assert "Za mało notowań" in _decision(app, n) and app.assessor.calls == 0
+
+
+def test_reject_low_liquidity_before_llm(make_app):
+    n = _news()
+    app = make_app([n])
+    app.settings.filters.min_avg_turnover_pln = 1e15
+    assert _decision(app, n) == "PKN: niska płynność" and app.assessor.calls == 0
+
+
+def test_reject_levels(make_app):
+    n = _news()
+    app = make_app([n])
+    app.settings.levels.max_sl_pct = 0.1
+    assert "poziomy – SL za daleko" in _decision(app, n)
+
+
+def test_reject_validation(make_app):
+    n = _news()
+    app = make_app([n])
+    app.settings.filters.min_rr_t1 = 5.0
+    assert "walidacja – R:R" in _decision(app, n)
+
+
+def test_reject_by_agent_and_score(make_app):
+    class NotActionable(FakeAssessor):
+        def assess(self, news, ticker, company):
+            self.calls += 1
+            return Assessment(ticker, False, "none", "inne", 0.2, 5, False, "Szum.")
+
+    n = _news()
+    app = make_app([n], assessor=NotActionable())
+    assert "odrzucony – agent: brak sygnału long" in _decision(app, n)
+    assert app.db.all_signals() == []
+
+
+def test_daily_limit_leaves_rest_in_queue(make_app):
+    a, b = _news("ORLEN podpisał umowę"), _news("PKO BP podał wyniki")
+    app = make_app([a, b])
+    app.settings.filters.max_signals_per_day = 1
+    assert len(app.run_once()) == 1
+    leftover = [_row(app, x) for x in (a, b) if _row(app, x)["processed"] == 0]
+    assert len(leftover) == 1 and leftover[0]["attempts"] == 0  # czeka, bez zużywania prób

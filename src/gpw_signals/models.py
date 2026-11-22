@@ -5,10 +5,10 @@ import hashlib
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 
-class SourceKind(str, Enum):
+class SourceKind(StrEnum):
     ESPI = "espi"        # raporty bieżące/okresowe ESPI/EBI
     BROKER = "broker"    # rekomendacje biur maklerskich
     PORTAL = "portal"    # portale finansowe
@@ -65,7 +65,7 @@ class Levels:
         return self.entry_mid - self.stop_loss
 
 
-class SignalStatus(str, Enum):
+class SignalStatus(StrEnum):
     PENDING_PUBLISH = "pending_publish"  # zapisany, jeszcze nie potwierdzony na kanale
     UNPUBLISHED = "unpublished"          # publikacja nie powiodła się w dopuszczalnym czasie
     ACTIVE = "active"

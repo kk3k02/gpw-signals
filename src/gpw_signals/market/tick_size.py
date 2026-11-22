@@ -22,7 +22,7 @@ def tick_for(price: float) -> float:
 
 
 def _decimals(tick: float) -> int:
-    return max(0, -int(math.floor(math.log10(tick)))) if tick < 1 else 0
+    return max(0, -math.floor(math.log10(tick))) if tick < 1 else 0
 
 
 def round_down(price: float) -> float:
