@@ -98,7 +98,7 @@ class App:
         news = fetch_all(self.sources)
         new = 0
         for n in news:
-            n.tickers = self.tickers.find(f"{n.title} {n.summary}")
+            n.tickers = self.tickers.map_news(n.title, n.summary, n.kind)
             new += self.db.insert_news_if_new(n)
         queue = self.db.pending_news()
         log.info("Nowych newsów: %d (z %d), w kolejce: %d", new, len(news), len(queue))

@@ -58,3 +58,9 @@ def test_tracker_never_entered_expires():
 def test_tracker_t3_closes():
     out = evaluate(_signal(), _bars([(61, 60), (68, 61)]))
     assert out.status == SignalStatus.T3 and out.closed
+
+
+def test_format_generated_company_without_duplicate_name():
+    s = _signal()
+    s.ticker = s.company_name = "POLIMEXMS"
+    assert format_signal(s, include_thesis=False).startswith("Nazwa spółki: POLIMEXMS\n")

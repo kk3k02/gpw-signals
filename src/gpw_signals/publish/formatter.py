@@ -10,8 +10,10 @@ def _p(x: float) -> str:
 
 def format_signal(s: Signal, include_thesis: bool = True, disclaimer: str = "") -> str:
     lv = s.levels
+    # Spółki z listy generowanej mają nazwę równą tickerowi (nazwa skrócona GPW) – bez powtórzenia
+    label = s.company_name if s.company_name.upper() == s.ticker.upper() else f"{s.company_name} ({s.ticker})"
     lines = [
-        f"Nazwa spółki: {s.company_name} ({s.ticker})",
+        f"Nazwa spółki: {label}",
         f"Wejście: {_p(lv.entry_min)}-{_p(lv.entry_max)}",
     ]
     for i, t in enumerate(lv.targets, start=1):

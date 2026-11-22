@@ -72,7 +72,10 @@ class ToolContext:
 
     def get_company_info(self, i: dict) -> dict:
         c = self.tickers.get(i["ticker"])
-        return c.__dict__ if c else {"error": "nieznany ticker"}
+        if not c:
+            return {"error": "nieznany ticker"}
+        return {"ticker": c.ticker, "name": c.name, "short_name": c.short_name, "isin": c.isin,
+                "sector": c.sector, "aliases": c.aliases}
 
     def run(self, name: str, tool_input: dict) -> tuple[str, bool]:
         """Zwraca (treść wyniku, is_error)."""

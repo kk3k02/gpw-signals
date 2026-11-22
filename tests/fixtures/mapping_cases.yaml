@@ -1,0 +1,102 @@
+# Zestaw do pomiaru jakości mapowania news -> spółka (#8).
+# Tytuły 1-58: prawdziwe z bankier.pl (ESPI i wiadomości, 22.11.2026), oznaczone ręcznie.
+# Dalej: przypadki dopisane celowo – pułapki (NBP, giełda GPW, kontrahenci w ESPI) i typowe nagłówki.
+# expected: tickery z data/gpw_tickers.csv; [] = news nie dotyczy spółki z rynku głównego GPW.
+
+# --- prawdziwe komunikaty ESPI (emitent przed ":"; spółki z NewConnect nie są na liście) ---
+- {kind: espi, title: "ROAD STUDIO S.A.: Ustalenie ram czasowych premiery Road Truckers: New Beginning", expected: []}
+- {kind: espi, title: "Merlin Group SA: Inne informacje", expected: []}
+- {kind: espi, title: "PLAY2CHILL S.A.: Przekroczenie progu 10% przez Phenomen Games S.A. wraz z Phenomen Games Fund Sp. z o. o.", expected: []}
+- {kind: espi, title: "VRFabric SA: Podpisanie przez emitenta z firmą audytorską umowy o badanie sprawozdań finansowych", expected: []}
+- {kind: espi, title: "STARWARD INDUSTRIES S.A.: Zawarcie kompletu umów objęcia i zakończenie subskrypcji akcji serii L", expected: []}
+- {kind: espi, title: "ROBYG S.A.: Wyniki finansowe QSr 3/2026", expected: [ROBYG]}
+- {kind: espi, title: "POLIMEX-MOSTOSTAL: Zawarcie aneksu do umowy linii gwarancyjnej.", expected: [POLIMEXMS]}
+- {kind: espi, title: "ZE PAK S.A.: Otrzymanie zawiadomienia od Argumenol Investment Company Limited o podwyższeniu ceny w wezwaniu", expected: [ZEPAK]}
+- {kind: espi, title: "SZAR S.A.: Zawiadomienie o nabyciu znacznegopakietu akcji", expected: []}
+- {kind: espi, title: "AIRWAY MEDIX S.A.: Przyjęcie aktualizacji strategicznych kierunków rozwoju Spółki.", expected: [AIRWAY]}
+
+# --- prawdziwe wiadomości z portalu ---
+- {kind: portal, title: "Korekta na złocie, krach srebra i nowy rekord w Polsce. \"To nie maszynka do zarabiania\"", expected: []}
+- {kind: portal, title: "Widzew trzyma ceny w ryzach. Fenomen łódzkiego rynku mieszkaniowego", expected: []}
+- {kind: portal, title: "Tajny fundusz i równoległa księgowość. Tak włoski Deutsche Bank ukrywał problemy", expected: []}
+- {kind: portal, title: "Alarmy i eksplozje przy rosyjskiej bazie. Pojawił się wątek możliwej prowokacji", expected: []}
+- {kind: portal, title: "Strach i niepewność na Wall Street. Co dalej z Nvidią, dokąd zmierza inflacja?", expected: []}
+- {kind: portal, title: "Cyberatak na Autopay. Firma ujawnia szczegóły, zagrożenie może dotyczyć kolejnych", expected: []}
+- {kind: portal, title: "Koniec eldorado w IT? Firmy ograniczają kontrakty, a podwyżek nie będzie", expected: []}
+- {kind: portal, title: "Trump pokazał zdjęcia ze szczytu w Chinach. Jeden podpis wywołał falę komentarzy", expected: []}
+- {kind: portal, title: "Iran uderza w tankowce w cieśninie Ormuz. Pokazał też podziemne miasto rakietowe", expected: []}
+- {kind: portal, title: "Atak na Hugging Face i 80 incydentów. Kalifornia pozywa OpenAI", expected: []}
+- {kind: portal, title: "Ponad połowa cudzoziemców doświadczyła przemocy w Polsce", expected: []}
+- {kind: portal, title: "Polacy coraz chętniej kupują nieruchomości w Hiszpanii. Padł kolejny rekord", expected: []}
+- {kind: portal, title: "Trump zabiegał o spotkanie z Kimem. Korea Północna powiedziała „nie”", expected: []}
+- {kind: portal, title: "Strajk w Niemczech obejmie 23 tys. pracowników. Na liście Mercedes i Siemens", expected: []}
+- {kind: portal, title: "Hakerzy włamali się do bazy FBI. Zaskakujący komentarz Trumpa", expected: []}
+- {kind: portal, title: "Jedna z największych zagadek matematyki rozwiązana? Naukowiec Anthropic twierdzi, że rozwiązał hipotezę Riemanna", expected: []}
+- {kind: portal, title: "Wrze na ulicach portugalskich miast. „Chcemy tanich mieszkań!”", expected: []}
+- {kind: portal, title: "Rutte w Warszawie: NATO będzie bronić każdego centymetra polskiego terytorium", expected: []}
+- {kind: portal, title: "Więcej ofiar niż w całym 2025 roku. ONZ podała nowe dane z Ukrainy", expected: []}
+- {kind: portal, title: "Tysiące osób mogły stracić dach nad głową. Sąd zablokował plan Trumpa", expected: []}
+- {kind: portal, title: "Z Wrocławia do Warszawy w 100 minut. Port Polska przedstawia nowe plany", expected: []}
+- {kind: portal, title: "Szczątki rakiet przywiezione przez służby? Rząd ujawnia nowe teorie dezinformacyjne", expected: []}
+- {kind: portal, title: "Startupów w Polsce przybywa, ale kapitał omija nasz rynek", expected: []}
+- {kind: portal, title: "Polska otrzyma silne wsparcie NATO. Ważne spotkanie już w poniedziałek", expected: []}
+- {kind: portal, title: "Costa proponuje nowy budżet UE. Jest też pomysł na podatek od gigantów technologicznych", expected: []}
+- {kind: portal, title: "Trump odsyła migrantów do Afryki. Kolejna grupa dotarła do Liberii", expected: []}
+- {kind: portal, title: "„Nie można już liczyć na USA”. Mocne słowa na forum bezpieczeństwa", expected: []}
+- {kind: portal, title: "NFZ nie wystarcza Polakom. Ponad 65 proc. korzysta z prywatnej opieki zdrowotnej", expected: []}
+- {kind: portal, title: "Aż 80 proc. kursów zamawianych przez aplikacje. Rynek taxi wart miliardy złotych", expected: []}
+- {kind: portal, title: "UE otwiera nowy rynek dla eksporterów. Umowa z Indonezją zniesie niemal wszystkie cła", expected: []}
+- {kind: portal, title: "Zełenski: Bez Polski nie będzie negocjacji pokojowych", expected: []}
+- {kind: portal, title: "Sikorski uderza w Nawrockiego. „Nie mamy systemu prezydenckiego”", expected: []}
+- {kind: portal, title: "Długość życia w Polsce rośnie, ale dystans do średniej UE się nie zmniejsza", expected: []}
+- {kind: portal, title: "PiS proponuje zmiany w kredytach. Banki miałyby uwzględniać 800+", expected: []}
+- {kind: portal, title: "Kredyt konsolidacyjny w VeloBanku. Aktywność daje niższe oprocentowanie", expected: []}
+- {kind: portal, title: "Melania Trump pomogła w ewakuacji Ukraińców. Zełenski szykuje kolejną akcję", expected: []}
+- {kind: portal, title: "Zełenski o wynikach szczytu w Shenzhen: „Jałta 2.0” się nie udała", expected: []}
+- {kind: portal, title: "Kosmiczny sukces polskich naukowców. Teleskop o średnicy 2,5 metra wykonał pierwsze zdjęcia", expected: []}
+- {kind: portal, title: "Baron narkotykowy z listy FBI zatrzymany. W Meksyku wybuchły walki", expected: []}
+- {kind: portal, title: "„Roboty zabijające” coraz bliżej. 128 państw rusza z pracami nad regulacjami", expected: []}
+- {kind: portal, title: "mBank oferuje 1000 zł premii. Dodatkowe 300 zł można wydać w Biedronce", expected: [MBANK]}
+- {kind: portal, title: "Chiny przygotowują grunt pod „dyplomację szczepionkową”", expected: []}
+- {kind: portal, title: "Dom Development sprzedał w III kw. 995 lokali netto, więcej rdr o 6 proc.", expected: [DOMDEV]}
+- {kind: portal, title: "Fundusz Hipoteczny Yanok usunięty z listy ostrzeżeń KNF", expected: []}
+- {kind: portal, title: "BM PKO BP liderem obrotów na rynku akcji GPW we wrześniu", expected: [PKO]}
+- {kind: portal, title: "Nadal brak porozumienia ws. brexitu", expected: []}
+- {kind: portal, title: "Premier: Naprawiamy i budujemy tysiące kilometrów dróg", expected: []}
+- {kind: portal, title: "Austria weszła w drugą falę epidemii koronawirusa", expected: []}
+
+# --- dopisane: ESPI z pełną nazwą emitenta ---
+- {kind: espi, title: "ORLEN S.A.: Zawarcie znaczącej umowy", expected: [PKN]}
+- {kind: espi, title: "Bank Polska Kasa Opieki S.A.: Rekomendacja wypłaty dywidendy", expected: [PEO]}
+- {kind: espi, title: "PKO Bank Polski SA: Informacja o wynikach stress testów", expected: [PKO]}
+- {kind: espi, title: "CD PROJEKT S.A.: Skonsolidowany raport kwartalny", expected: [CDR]}
+- {kind: espi, title: "11 bit studios S.A.: Data premiery gry", expected: [11BIT]}
+- {kind: espi, title: "ASSECO POLAND S.A.: Zawarcie umowy z Ministerstwem Cyfryzacji", expected: [ASSECOPOL]}
+- {kind: espi, title: "Grupa Azoty Zakłady Chemiczne POLICE S.A.: Raport bieżący", expected: [POLICE]}
+- {kind: espi, title: "KGHM Polska Miedź S.A.: Zawarcie umowy z ORLEN S.A.", expected: [KGH]}
+- {kind: espi, title: "Santander Bank Polska S.A.: Zmiana firmy Banku", expected: [ERSTEPL]}
+
+# --- dopisane: pułapki w wiadomościach ---
+- {kind: portal, title: "Narodowy Bank Polski pozostawił stopy procentowe bez zmian", expected: []}
+- {kind: portal, title: "Rekordowe obroty na GPW w listopadzie", expected: []}
+- {kind: portal, title: "W Policach otwarto nowe centrum logistyczne", expected: []}
+- {kind: portal, title: "Polska policja zatrzymała hakerów", expected: []}
+- {kind: portal, title: "Kruk przysiadł na dachu ratusza – mieszkańcy zaskoczeni", expected: []}
+
+# --- dopisane: typowe nagłówki rynkowe ---
+- {kind: portal, title: "Orlen i PKO BP ciągną WIG20 w górę", expected: [PKN, PKO]}
+- {kind: portal, title: "Akcje KGHM tanieją po spadku cen miedzi", expected: [KGH]}
+- {kind: portal, title: "Budimex z nowym kontraktem kolejowym za 1,2 mld zł", expected: [BUDIMEX]}
+- {kind: portal, title: "Analitycy podnoszą cenę docelową Dino Polska", expected: [DNP]}
+- {kind: portal, title: "ING Bank Śląski i Bank Millennium z wynikami powyżej prognoz", expected: [INGBSK, MILLENNIUM]}
+- {kind: portal, title: "Tauron i Enea tracą po decyzji URE", expected: [TAURONPE, ENEA]}
+- {kind: portal, title: "Giełda Papierów Wartościowych w Warszawie wypłaci rekordową dywidendę", expected: [GPW]}
+- {kind: portal, title: "Kruk kupił portfel wierzytelności za 300 mln zł", expected: [KRUK]}
+- {kind: portal, title: "CCC/Modivo: nowa strategia sklepów", expected: [MODIVO]}
+- {kind: portal, title: "Cyfrowy Polsat z rekordową liczbą klientów", expected: [CYFRPLSAT]}
+
+# --- spółka wymieniona tylko pobocznie w leadzie (prawdziwy news z 22.11.2026) ---
+- kind: portal
+  title: "Cyberatak na Autopay. Firma ujawnia szczegóły, zagrożenie może dotyczyć kolejnych"
+  summary: "Spółka Autopay przekazała zespołowi CSIR KNF i instytucjom finansowym szczegóły dot. sposobu działania sprawców cyberataku. Do ataku na swoich stronach odniosły się m.in. BNP Paribas i Bank Pekao."
+  expected: []

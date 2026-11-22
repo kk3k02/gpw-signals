@@ -239,5 +239,8 @@ def sync(client: GpwArchiveClient, store: PriceStore, share_symbols: dict[str, s
     log.info("Import zakończony: sesji %d, dni bez sesji %d, zapisanych wierszy %d, spółek GPW spoza listy %d",
              summary.sessions, summary.no_session, summary.rows, len(summary.unmapped_isins))
     if summary.missing_symbols:
-        log.warning("Brak notowań w części sesji dla: %s", summary.missing_symbols)
+        # Zwykle małe spółki bez transakcji w części sesji – kontrola jakości oceni, czy dane są aktualne
+        worst = sorted(summary.missing_symbols.items(), key=lambda kv: -kv[1])[:5]
+        log.info("Spółki bez obrotu w części sesji: %d (najwięcej braków: %s)", len(summary.missing_symbols),
+                 ", ".join(f"{k}={v}" for k, v in worst))
     return summary
