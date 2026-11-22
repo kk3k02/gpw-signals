@@ -149,7 +149,9 @@ def test_gives_up_after_max_attempts(make_app):
 
 
 def test_unexpected_error_does_not_stop_cycle(make_app):
-    bad, good = _news("ORLEN zawarł umowę"), _news("PKO BP podał wyniki")
+    # Kolejka idzie od najnowszego newsa – jawne czasy, żeby kolejność nie zależała od rozdzielczości zegara
+    bad = _news("ORLEN zawarł umowę", age=timedelta(minutes=1))
+    good = _news("PKO BP podał wyniki", age=timedelta(minutes=2))
     app = make_app([bad, good], assessor=FakeAssessor(KeyError("bug")))
     sigs = app.run_once()
     assert [s.ticker for s in sigs] == ["PKO"]
@@ -239,7 +241,8 @@ def test_reject_no_ticker(make_app):
 
 
 def test_reject_cooldown(make_app):
-    first, second = _news("ORLEN podpisał umowę"), _news("ORLEN rozszerza współpracę")
+    first = _news("ORLEN podpisał umowę", age=timedelta(minutes=1))  # nowszy -> przetwarzany pierwszy
+    second = _news("ORLEN rozszerza współpracę", age=timedelta(minutes=2))
     app = make_app([first, second])
     sigs = app.run_once()
     assert len(sigs) == 1
