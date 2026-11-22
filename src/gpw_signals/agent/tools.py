@@ -51,7 +51,7 @@ class ToolContext:
         c = self.tickers.get(ticker)
         if not c:
             raise ValueError(f"Nieznany ticker {ticker}")
-        return c.stooq_symbol
+        return c.symbol
 
     def handlers(self) -> dict[str, Callable[[dict], Any]]:
         return {

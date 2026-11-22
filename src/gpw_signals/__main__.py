@@ -5,6 +5,7 @@ import argparse
 import json
 import logging
 import sys
+from datetime import date
 
 from .config import load_settings
 
@@ -21,6 +22,9 @@ def main(argv: list[str] | None = None) -> int:
     once = sub.add_parser("once", help="Jeden cykl przetwarzania newsów")
     once.add_argument("--dry-run", action="store_true", help="Drukuj zamiast wysyłać, baza w pamięci")
     sub.add_parser("track", help="Sprawdź wyniki otwartych sygnałów")
+    fp = sub.add_parser("fetch-prices", help="Import notowań dziennych z archiwum GPW do data/prices")
+    fp.add_argument("--from", dest="start", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: od braków)")
+    fp.add_argument("--to", dest="end", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: dziś)")
     sub.add_parser("stats", help="Statystyki skuteczności")
     bt = sub.add_parser("backtest", help="Backtest silnika poziomów na historii notowań")
     bt.add_argument("tickers", nargs="+")
@@ -42,6 +46,10 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "once":
         sigs = App.build(s, dry_run=args.dry_run).run_once()
         print(f"Sygnałów: {len(sigs)}")
+    elif args.cmd == "fetch-prices":
+        # Import notowań nie publikuje ani nie używa bazy sygnałów – nie wymaga tokenu Telegrama
+        summary = App.build(s, dry_run=True).sync_prices(args.start, args.end)
+        print(f"Sesji: {summary.sessions}, dni bez sesji: {summary.no_session}, wierszy: {summary.rows}")
     elif args.cmd == "track":
         App.build(s).track()
     elif args.cmd == "stats":
@@ -53,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
             from .backtest import backtest_levels
             for tk in args.tickers:
                 c = app.tickers.get(tk)
-                df = app.prices.daily(c.stooq_symbol, 2000)
+                df = app.prices.daily(c.symbol, 2000)
                 print(tk, dict(backtest_levels(df, s.levels, args.horizon)))
         else:
             _preview(app, args.ticker)
@@ -69,7 +77,7 @@ def _preview(app, ticker: str) -> None:
     from .publish.formatter import format_signal
 
     c = app.tickers.get(ticker)
-    snap = snapshot(app.prices.daily(c.stooq_symbol, 260))
+    snap = snapshot(app.prices.daily(c.symbol, 260))
     lr = compute_levels(snap, app.settings.levels)
     if lr.levels is None:
         print("Brak poziomów:", lr.reason)

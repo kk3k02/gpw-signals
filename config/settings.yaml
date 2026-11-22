@@ -8,7 +8,8 @@ schedule:
   poll_minutes: 5                # co ile minut sprawdzać newsy
   active_from: "08:00"           # ESPI spływają też przed sesją
   active_to: "17:10"
-  tracker_at: "17:30"            # sprawdzanie wyników sygnałów po sesji
+  prices_at: "18:15"             # import notowań z archiwum GPW (po publikacji pliku dziennego)
+  tracker_at: "18:30"            # sprawdzanie wyników sygnałów po imporcie notowań
   # Dni bez sesji na GPW – UZUPEŁNIJ z oficjalnego kalendarza GPW na dany rok
   holidays:
     - "2026-12-24"
@@ -30,10 +31,19 @@ sources:
   macro_calendar_file: data/macro_calendar.yaml
 
 market:
-  # csv   – pliki {csv_dir}/{symbol}.csv zasilane przez Twoje (licencjonowane) źródło danych
-  # stooq – pobieranie CSV ze stooq; obecnie serwis odpowiada stroną anty-botową, wymaga własnego dostępu
+  # csv   – pliki {csv_dir}/{symbol}.csv; domyślnie zasila je import z archiwum GPW
+  #         (python -m gpw_signals fetch-prices), ale możesz je zapisywać z dowolnego źródła
+  # stooq – pobieranie CSV ze stooq; obecnie serwis odpowiada stroną anty-botową
   provider: csv
   csv_dir: data/prices
+  # Darmowe dane dzienne z gpw.pl/archiwum-notowan (opóźnione, nieskorygowane o splity).
+  # Przed publicznym kanałem sprawdź warunki korzystania z danych GPW (#16).
+  gpw_archive_url: "https://www.gpw.pl/archiwum-notowan?fetch=1&type={type}&instrument=&date={date}"
+  raw_dir: data/raw/gpw          # cache surowych plików – ponowny import bez sieci
+  min_interval_s: 1.5            # odstęp między zapytaniami do gpw.pl
+  index_symbols: {WIG20: wig20, WIG: wig}
+  max_data_age_days: 5           # starsze notowania = dane nieaktualne, spółka pomijana
+  max_jump_pct: 40.0             # większy skok dzienny = możliwy split, spółka pomijana
   stooq_url: "https://stooq.pl/q/d/l/?s={symbol}&i=d"
   history_days: 250
   index_symbol: "wig20"

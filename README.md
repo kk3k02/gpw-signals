@@ -26,6 +26,7 @@ Tracker po sesji: T1/T2/T3/SL/wygaśnięcie → odpowiedź pod sygnałem + staty
 uv venv; uv pip install -e ".[dev]"
 copy .env.example .env      # uzupełnij klucze
 python -m pytest
+python -m gpw_signals fetch-prices         # notowania z archiwum GPW (pierwszy raz ok. 15 min)
 python -m gpw_signals preview PKN          # poziomy bez LLM
 python -m gpw_signals backtest PKN LPP     # kalibracja silnika poziomów
 python -m gpw_signals once --dry-run       # pełny cykl, druk zamiast wysyłki
@@ -35,7 +36,10 @@ python -m gpw_signals stats
 
 ## Do zrobienia przed produkcją
 
-- **Dane cenowe:** `data/prices/*.csv` to **syntetyczne dane demo**. Podłącz licencjonowane źródło notowań: zapisuj CSV do `data/prices` albo dopisz własny `PriceProvider`. Stooq odpowiada obecnie stroną anty-botową.
+- **Dane cenowe:** domyślnie darmowe notowania dzienne z [archiwum GPW](https://www.gpw.pl/archiwum-notowan), importowane do `data/prices/` (`fetch-prices`, a w trybie `run` codziennie o `schedule.prices_at`). Surowe pliki są w cache `data/raw/gpw/`, więc po dopisaniu spółek do `gpw_tickers.csv` ponowny import nie pobiera nic z sieci. Ograniczenia:
+  - dane są **dzienne**, więc w trakcie sesji poziomy liczą się od ostatniego zamknięcia (#4),
+  - ceny są **nieskorygowane** o splity i prawa poboru; spółka ze skokiem kursu > `max_jump_pct` jest pomijana,
+  - przed publicznym kanałem sprawdź warunki korzystania z danych GPW (#16). Inne źródło podepniesz, zapisując CSV do `data/prices` albo dopisując własny `PriceProvider`.
 - **Źródła:** zweryfikuj URL-e feedów i regulaminy serwisów w `config/settings.yaml`. Feed `bankier-rekomendacje` zwraca 0 pozycji.
 - **Tickery:** uzupełnij `data/gpw_tickers.csv` o pełną listę spółek.
 - **Krok notowań:** `market/tick_size.py` to tabela uproszczona. Na GPW krok zależy też od pasma płynności.
