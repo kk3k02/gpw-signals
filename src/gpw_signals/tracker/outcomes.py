@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from ..clock import MARKET_TZ, market_date
 from ..models import Signal, SignalStatus
 
 _ORDER = [SignalStatus.ACTIVE, SignalStatus.T1, SignalStatus.T2, SignalStatus.T3]
@@ -16,7 +18,7 @@ class Outcome:
     closed: bool
 
 
-def evaluate(signal: Signal, bars: pd.DataFrame) -> Outcome:
+def evaluate(signal: Signal, bars: pd.DataFrame, tz: ZoneInfo = MARKET_TZ) -> Outcome:
     """Ocena na podstawie sesji PO dniu publikacji (przelicza całą historię – idempotentnie).
 
     - Sygnał „startuje”, gdy kurs wejdzie w strefę (low <= entry_max).
@@ -26,7 +28,8 @@ def evaluate(signal: Signal, bars: pd.DataFrame) -> Outcome:
     """
     lv = signal.levels
     status = SignalStatus.ACTIVE
-    after = bars[bars.index.normalize() > pd.Timestamp(signal.created_at.date())]
+    # Świece dzienne są w datach sesji (czas PL) – porównujemy z datą sesji publikacji, nie z datą UTC
+    after = bars[bars.index.normalize() > pd.Timestamp(market_date(signal.created_at, tz))]
     entered = False
     for _, b in after.iterrows():
         if not entered:

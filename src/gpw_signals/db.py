@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
+from .clock import from_iso, to_iso
 from .models import Assessment, Levels, NewsItem, Signal, SignalStatus, SourceKind
 
 SCHEMA = """
@@ -30,6 +31,10 @@ CREATE INDEX IF NOT EXISTS ix_news_pending ON news(processed, published_at);
 # Kolumny dodane po pierwszej wersji schematu – dopisywane do istniejących baz
 _MIGRATIONS = {"news": {"attempts": "INTEGER DEFAULT 0", "last_error": "TEXT"}}
 
+# Wersja formatu danych (PRAGMA user_version). 1 = wszystkie daty w UTC w formacie clock.to_iso.
+_DATA_VERSION = 1
+_DATE_COLUMNS = {"news": ["published_at"], "signals": ["created_at", "closed_at"]}
+
 
 class Database:
     def __init__(self, path: str | Path):
@@ -39,6 +44,7 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         self._migrate()
         self.conn.executescript(SCHEMA)
+        self._migrate_dates()
 
     def _migrate(self) -> None:
         for table, cols in _MIGRATIONS.items():
@@ -50,13 +56,30 @@ class Database:
                     self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {ddl}")
         self.conn.commit()
 
+    def _migrate_dates(self) -> None:
+        """Jednorazowo: daty bez strefy z wcześniejszych wersji (zapisane jako czas lokalny serwera)
+        przelicza na UTC, a wszystkie daty sprowadza do jednego formatu."""
+        if self.conn.execute("PRAGMA user_version").fetchone()[0] >= _DATA_VERSION:
+            return
+        for table, cols in _DATE_COLUMNS.items():
+            for col in cols:
+                rows = self.conn.execute(f"SELECT rowid, {col} FROM {table} WHERE {col} IS NOT NULL").fetchall()
+                for rowid, value in rows:
+                    dt = datetime.fromisoformat(value)
+                    # naiwna data = datetime.now() serwera -> astimezone() interpretuje ją jako czas lokalny
+                    fixed = to_iso(dt if dt.tzinfo else dt.astimezone())
+                    if fixed != value:
+                        self.conn.execute(f"UPDATE {table} SET {col}=? WHERE rowid=?", (fixed, rowid))
+        self.conn.execute(f"PRAGMA user_version = {_DATA_VERSION}")
+        self.conn.commit()
+
     # --- news ---
     def insert_news_if_new(self, item: NewsItem) -> bool:
         cur = self.conn.execute(
             "INSERT OR IGNORE INTO news (uid, source, kind, title, url, summary, published_at, priority, tickers)"
             " VALUES (?,?,?,?,?,?,?,?,?)",
             (item.uid, item.source, item.kind.value, item.title, item.url, item.summary,
-             item.published_at.isoformat(), item.priority, json.dumps(item.tickers)),
+             to_iso(item.published_at), item.priority, json.dumps(item.tickers)),
         )
         self.conn.commit()
         return cur.rowcount == 1
@@ -82,7 +105,7 @@ class Database:
         rows = self.conn.execute(
             "SELECT * FROM news WHERE processed=0 ORDER BY priority DESC, published_at DESC").fetchall()
         return [NewsItem(source=r["source"], kind=SourceKind(r["kind"]), title=r["title"], url=r["url"],
-                         published_at=_aware(datetime.fromisoformat(r["published_at"])),
+                         published_at=from_iso(r["published_at"]),
                          summary=r["summary"] or "", priority=r["priority"],
                          tickers=json.loads(r["tickers"] or "[]")) for r in rows]
 
@@ -102,7 +125,7 @@ class Database:
             "INSERT INTO signals (ticker, company_name, created_at, news_uid, entry_min, entry_max, t1, t2, t3,"
             " stop_loss, score, assessment, status, horizon_days, telegram_message_id)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (s.ticker, s.company_name, s.created_at.isoformat(), s.news_uid, lv.entry_min, lv.entry_max,
+            (s.ticker, s.company_name, to_iso(s.created_at), s.news_uid, lv.entry_min, lv.entry_max,
              *lv.targets, lv.stop_loss, s.score, json.dumps(s.assessment.__dict__, ensure_ascii=False),
              s.status.value, s.assessment.horizon_days, s.telegram_message_id),
         )
@@ -110,10 +133,11 @@ class Database:
         s.id = cur.lastrowid
         return s.id
 
-    def update_signal_status(self, signal_id: int, status: SignalStatus, closed: bool = False) -> None:
+    def update_signal_status(self, signal_id: int, status: SignalStatus, closed_at: datetime | None = None) -> None:
+        """`closed_at` podane = sygnał zamknięty w tej chwili; None = nadal otwarty."""
         self.conn.execute(
             "UPDATE signals SET status=?, closed_at=? WHERE id=?",
-            (status.value, datetime.now().isoformat() if closed else None, signal_id))
+            (status.value, to_iso(closed_at) if closed_at else None, signal_id))
         self.conn.commit()
 
     def mark_published(self, signal_id: int, message_id: int | None) -> None:
@@ -126,17 +150,18 @@ class Database:
                                  (SignalStatus.PENDING_PUBLISH.value,)).fetchall()
         return [self._row_to_signal(r) for r in rows]
 
-    def has_recent_signal(self, ticker: str, days: int) -> bool:
-        since = (datetime.now() - timedelta(days=days)).isoformat()
+    def has_recent_signal(self, ticker: str, since: datetime) -> bool:
+        """Czy spółka ma sygnał otwarty albo utworzony od `since` (cooldown)."""
         row = self.conn.execute(
             "SELECT 1 FROM signals WHERE ticker=? AND (created_at>=? OR closed_at IS NULL) LIMIT 1",
-            (ticker, since)).fetchone()
+            (ticker, to_iso(since))).fetchone()
         return row is not None
 
-    def signals_today(self) -> int:
-        today = datetime.now().date().isoformat()
+    def count_signals_between(self, start: datetime, end: datetime) -> int:
+        """Liczba sygnałów utworzonych w [start, end) – np. w granicach dnia sesji z clock.market_day_bounds."""
         return self.conn.execute(
-            "SELECT COUNT(*) FROM signals WHERE substr(created_at,1,10)=?", (today,)).fetchone()[0]
+            "SELECT COUNT(*) FROM signals WHERE created_at>=? AND created_at<?",
+            (to_iso(start), to_iso(end))).fetchone()[0]
 
     def open_signals(self) -> list[Signal]:
         # Tracker śledzi tylko sygnały faktycznie opublikowane
@@ -154,10 +179,6 @@ class Database:
             id=r["id"], ticker=r["ticker"], company_name=r["company_name"],
             levels=Levels(r["entry_min"], r["entry_max"], [r["t1"], r["t2"], r["t3"]], r["stop_loss"]),
             score=r["score"], assessment=a, news_uid=r["news_uid"],
-            created_at=datetime.fromisoformat(r["created_at"]), status=SignalStatus(r["status"]),
+            created_at=from_iso(r["created_at"]), status=SignalStatus(r["status"]),
             telegram_message_id=r["telegram_message_id"],
         )
-
-
-def _aware(dt: datetime) -> datetime:
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
