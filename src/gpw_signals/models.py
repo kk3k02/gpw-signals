@@ -66,6 +66,8 @@ class Levels:
 
 
 class SignalStatus(str, Enum):
+    PENDING_PUBLISH = "pending_publish"  # zapisany, jeszcze nie potwierdzony na kanale
+    UNPUBLISHED = "unpublished"          # publikacja nie powiodła się w dopuszczalnym czasie
     ACTIVE = "active"
     T1 = "t1"
     T2 = "t2"
