@@ -1,0 +1,44 @@
+# Sygnalista GPW
+
+Bot, który czyta newsy z rynku (ESPI/EBI, portale, rekomendacje DM, kalendarz makro). Agent Claude ocenia każdy news, a deterministyczny algorytm liczy z notowań poziomy wejścia, T1–T3 i SL. Gotowy sygnał trafia automatycznie na kanał Telegram:
+
+```
+Nazwa spółki: ORLEN (PKN)
+Wejście: 56.08-56.82
+Target 1: 58.56, +3.7%
+Target 2: 61.46, +8.9%
+Target 3: 63.98, +13.3%
+StopLoss: 53.94
+```
+
+## Przepływ
+
+```
+RSS/ESPI → dedup (SQLite) → mapowanie na ticker → pre-filtr płynności
+  → agent Claude (ocena + narzędzia do danych, bez cen) → silnik poziomów (ATR, swingi, R)
+  → walidacja → scoring/filtry (trend, wolumen, reżim WIG20, wyniki, cooldown) → Telegram
+Tracker po sesji: T1/T2/T3/SL/wygaśnięcie → odpowiedź pod sygnałem + statystyki
+```
+
+## Start
+
+```powershell
+uv venv; uv pip install -e ".[dev]"
+copy .env.example .env      # uzupełnij klucze
+python -m pytest
+python -m gpw_signals preview PKN          # poziomy bez LLM
+python -m gpw_signals backtest PKN LPP     # kalibracja silnika poziomów
+python -m gpw_signals once --dry-run       # pełny cykl, druk zamiast wysyłki
+python -m gpw_signals run                  # produkcja (scheduler)
+python -m gpw_signals stats
+```
+
+## Do zrobienia przed produkcją
+
+- **Dane cenowe:** `data/prices/*.csv` to **syntetyczne dane demo**. Podłącz licencjonowane źródło notowań: zapisuj CSV do `data/prices` albo dopisz własny `PriceProvider`. Stooq odpowiada obecnie stroną anty-botową.
+- **Źródła:** zweryfikuj URL-e feedów i regulaminy serwisów w `config/settings.yaml`. Feed `bankier-rekomendacje` zwraca 0 pozycji.
+- **Tickery:** uzupełnij `data/gpw_tickers.csv` o pełną listę spółek.
+- **Krok notowań:** `market/tick_size.py` to tabela uproszczona. Na GPW krok zależy też od pasma płynności.
+- **Kalendarz:** święta GPW w `settings.yaml` oraz kalendarz wyników w `data/macro_calendar.yaml`.
+- **Prawo:** publiczne sygnały kup/cel/SL to w UE rekomendacje inwestycyjne (MAR art. 20, rozporządzenie 2016/958, nadzór KNF). Przed uruchomieniem publicznego kanału skonsultuj się z prawnikiem.
+- Na start `publish.use_test_channel: true`. Kanał docelowy włączaj dopiero po okresie testów i analizie `stats`.

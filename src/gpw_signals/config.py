@@ -1,0 +1,108 @@
+"""Konfiguracja: progi i parametry z settings.yaml, sekrety z .env / zmiennych środowiskowych."""
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Secrets(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    anthropic_api_key: str = ""
+    telegram_bot_token: str = ""
+    telegram_channel_id: str = ""
+    telegram_test_channel_id: str = ""
+
+
+class FeedConfig(BaseModel):
+    name: str
+    kind: str  # espi | portal | broker | macro
+    url: str
+    priority: int = 1
+
+
+class SourcesConfig(BaseModel):
+    rss: list[FeedConfig] = Field(default_factory=list)
+    broker_keywords: list[str] = Field(default_factory=list)
+    macro_calendar_file: str = "data/macro_calendar.yaml"
+
+
+class ScheduleConfig(BaseModel):
+    poll_minutes: int = 5
+    active_from: str = "08:00"
+    active_to: str = "17:10"
+    tracker_at: str = "17:30"
+    holidays: list[str] = Field(default_factory=list)
+
+
+class MarketConfig(BaseModel):
+    provider: str = "stooq"
+    stooq_url: str = "https://stooq.pl/q/d/l/?s={symbol}&i=d"
+    csv_dir: str = "data/prices"
+    history_days: int = 250
+    index_symbol: str = "wig20"
+
+
+class AgentConfig(BaseModel):
+    model: str = "claude-opus-5-5"
+    effort: str = "high"
+    max_tokens: int = 16000
+    max_tool_rounds: int = 8
+    use_fallbacks: bool = True
+
+
+class LevelsConfig(BaseModel):
+    atr_period: int = 14
+    entry_below_atr: float = 0.3
+    entry_above_atr: float = 0.2
+    sl_atr: float = 1.5
+    sl_swing_buffer_atr: float = 0.2
+    max_sl_pct: float = 8.0
+    r_multiples: list[float] = Field(default_factory=lambda: [1.0, 2.0, 3.0])
+    resistance_snap_r: float = 0.5
+    swing_window: int = 5
+    swing_lookback: int = 120
+
+
+class FiltersConfig(BaseModel):
+    min_avg_turnover_pln: float = 1_000_000
+    min_rr_t1: float = 1.0
+    require_above_sma50: bool = True
+    strong_catalyst_override: float = 0.8
+    min_volume_ratio: float = 1.2
+    max_gap_pct: float = 6.0
+    block_bear_regime: bool = True
+    cooldown_days: int = 5
+    max_signals_per_day: int = 5
+    min_score: float = 0.55
+
+
+class PublishConfig(BaseModel):
+    enabled: bool = True
+    use_test_channel: bool = True
+    include_thesis: bool = True
+    post_outcomes: bool = True
+    disclaimer: str = ""
+
+
+class Settings(BaseModel):
+    db_path: str = "data/gpw_signals.sqlite"
+    tickers_csv: str = "data/gpw_tickers.csv"
+    timezone: str = "Europe/Warsaw"
+    schedule: ScheduleConfig = Field(default_factory=ScheduleConfig)
+    sources: SourcesConfig = Field(default_factory=SourcesConfig)
+    market: MarketConfig = Field(default_factory=MarketConfig)
+    agent: AgentConfig = Field(default_factory=AgentConfig)
+    levels: LevelsConfig = Field(default_factory=LevelsConfig)
+    filters: FiltersConfig = Field(default_factory=FiltersConfig)
+    publish: PublishConfig = Field(default_factory=PublishConfig)
+    secrets: Secrets = Field(default_factory=Secrets)
+
+
+def load_settings(path: str | Path = "config/settings.yaml") -> Settings:
+    p = Path(path)
+    data = yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {}
+    return Settings(**(data or {}), secrets=Secrets())

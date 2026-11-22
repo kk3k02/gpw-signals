@@ -1,0 +1,6 @@
+# Kalendarz zdarzeń: data -> lista opisów. "ticker:XXX" oznacza zdarzenie spółki (np. wyniki).
+# Uzupełniaj ręcznie albo generuj skryptem z kalendarza wyników.
+"2026-12-02":
+  - "Decyzja RPP w sprawie stóp procentowych"
+"2026-12-10":
+  - "ticker:LPP Wyniki kwartalne"

@@ -1,0 +1,11 @@
+ticker,name,stooq_symbol,sector,aliases
+PKN,ORLEN,pkn,paliwa,ORLEN|PKN ORLEN|Orlen SA
+PKO,PKO BP,pko,banki,PKO BP|PKO Bank Polski|Bank Polski
+PEO,Bank Pekao,peo,banki,Pekao|Bank Pekao
+PZU,PZU,pzu,ubezpieczenia,PZU|Powszechny Zakład Ubezpieczeń
+KGH,KGHM,kgh,surowce,KGHM|KGHM Polska Miedź
+CDR,CD Projekt,cdr,gry,CD Projekt|CD PROJEKT|CDP
+DNP,Dino Polska,dnp,handel,Dino|Dino Polska
+LPP,LPP,lpp,odzież,LPP
+ALE,Allegro,ale,e-commerce,Allegro|Allegro.eu
+PGE,PGE,pge,energetyka,PGE|Polska Grupa Energetyczna

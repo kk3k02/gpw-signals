@@ -1,0 +1,79 @@
+# Konfiguracja Sygnalisty GPW. Sekrety trzymamy w .env, nie tutaj.
+
+db_path: data/gpw_signals.sqlite
+tickers_csv: data/gpw_tickers.csv
+timezone: Europe/Warsaw
+
+schedule:
+  poll_minutes: 5                # co ile minut sprawdzać newsy
+  active_from: "08:00"           # ESPI spływają też przed sesją
+  active_to: "17:10"
+  tracker_at: "17:30"            # sprawdzanie wyników sygnałów po sesji
+  # Dni bez sesji na GPW – UZUPEŁNIJ z oficjalnego kalendarza GPW na dany rok
+  holidays:
+    - "2026-12-24"
+    - "2026-12-25"
+    - "2026-12-31"
+    - "2027-01-01"
+    - "2027-01-06"
+
+sources:
+  # Każdy feed: name, kind (espi|portal|broker|macro), url, priority (wyżej = ważniejszy).
+  # URL-e są przykładowe – ZWERYFIKUJ je i regulaminy serwisów przed użyciem.
+  rss:
+    - {name: bankier-espi, kind: espi, priority: 3, url: "https://www.bankier.pl/rss/espi.xml"}
+    - {name: bankier-wiadomosci, kind: portal, priority: 1, url: "https://www.bankier.pl/rss/wiadomosci.xml"}
+    - {name: bankier-rekomendacje, kind: broker, priority: 2, url: "https://www.bankier.pl/rss/rekomendacje.xml"}
+  # Po tych rdzeniach news z portalu traktujemy jako rekomendację DM (wszystkie rdzenie frazy muszą wystąpić)
+  broker_keywords: ["rekomendac", "cen docelow", "kupuj", "akumuluj"]
+  # Kalendarz makro/wyników – ręcznie lub z pliku (YYYY-MM-DD: opis)
+  macro_calendar_file: data/macro_calendar.yaml
+
+market:
+  # csv   – pliki {csv_dir}/{symbol}.csv zasilane przez Twoje (licencjonowane) źródło danych
+  # stooq – pobieranie CSV ze stooq; obecnie serwis odpowiada stroną anty-botową, wymaga własnego dostępu
+  provider: csv
+  csv_dir: data/prices
+  stooq_url: "https://stooq.pl/q/d/l/?s={symbol}&i=d"
+  history_days: 250
+  index_symbol: "wig20"
+
+agent:
+  model: claude-opus-5-5
+  effort: high                   # low | medium | high | xhigh | max
+  max_tokens: 16000
+  max_tool_rounds: 8
+  use_fallbacks: true            # serwerowy fallback przy odmowie modelu
+
+levels:
+  atr_period: 14
+  entry_below_atr: 0.3           # dolna granica strefy wejścia = close - k*ATR
+  entry_above_atr: 0.2           # górna granica = close + k*ATR
+  sl_atr: 1.5                    # SL = entry_min - k*ATR (lub poniżej swing low)
+  sl_swing_buffer_atr: 0.2
+  max_sl_pct: 8.0                # SL dalej niż X% od środka wejścia -> odrzucamy
+  r_multiples: [1.0, 2.0, 3.0]   # T1, T2, T3 jako wielokrotności ryzyka R
+  resistance_snap_r: 0.5         # opór w odległości < k*R poniżej celu "przyciąga" cel
+  swing_window: 5
+  swing_lookback: 120
+
+filters:
+  min_avg_turnover_pln: 1000000  # średni obrót 20 sesji
+  min_rr_t1: 1.0
+  require_above_sma50: true
+  strong_catalyst_override: 0.8  # siła >= tej wartości zwalnia z filtra SMA50
+  min_volume_ratio: 1.2          # wolumen ostatniej sesji / średnia 20
+  max_gap_pct: 6.0               # jeśli kurs już wystrzelił, nie gonimy
+  block_bear_regime: true
+  cooldown_days: 5               # max 1 aktywny sygnał na spółkę w tym okresie
+  max_signals_per_day: 5
+  min_score: 0.55
+
+publish:
+  enabled: true                  # wyłącznik awaryjny
+  use_test_channel: true         # NA START: publikuj na kanał testowy
+  include_thesis: true
+  post_outcomes: true            # "✅ T1 osiągnięty" itd.
+  disclaimer: >-
+    Materiał ma charakter informacyjny i nie stanowi rekomendacji inwestycyjnej ani porady.
+    Sygnał wygenerowany automatycznie. Inwestowanie wiąże się z ryzykiem utraty kapitału.
