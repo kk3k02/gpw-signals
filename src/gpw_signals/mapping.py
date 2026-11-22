@@ -13,9 +13,10 @@ from rapidfuzz import fuzz
 class Company:
     ticker: str
     name: str
-    stooq_symbol: str
+    symbol: str            # nazwa pliku/klucz notowań, np. "pkn" -> data/prices/pkn.csv
     sector: str
     aliases: list[str]
+    isin: str = ""         # klucz w archiwum notowań GPW
 
 
 class TickerMap:
@@ -26,9 +27,13 @@ class TickerMap:
     def from_csv(cls, path: str | Path) -> TickerMap:
         with open(path, encoding="utf-8", newline="") as f:
             rows = list(csv.DictReader(f))
-        return cls([Company(r["ticker"].upper(), r["name"], r["stooq_symbol"], r.get("sector", ""),
-                            [a.strip() for a in r.get("aliases", "").split("|") if a.strip()])
+        return cls([Company(r["ticker"].upper(), r["name"], r["symbol"], r.get("sector", ""),
+                            [a.strip() for a in r.get("aliases", "").split("|") if a.strip()],
+                            r.get("isin", "").strip().upper())
                     for r in rows])
+
+    def by_isin(self) -> dict[str, Company]:
+        return {c.isin: c for c in self.companies.values() if c.isin}
 
     def get(self, ticker: str) -> Company | None:
         return self.companies.get(ticker.upper())

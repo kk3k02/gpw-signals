@@ -43,6 +43,21 @@ def run_forever(app: App) -> None:
             except Exception:
                 log.exception("Błąd trackera")
 
+    def prices() -> None:
+        if is_session_day(datetime.now(tz).date(), s.schedule.holidays):
+            try:
+                app.sync_prices()
+            except Exception:
+                log.exception("Błąd importu notowań")
+
+    # Na starcie dociągamy zaległe notowania (np. po przerwie w działaniu bota)
+    try:
+        app.sync_prices()
+    except Exception:
+        log.exception("Błąd importu notowań przy starcie")
+
+    ph, pm = s.schedule.prices_at.split(":")
+    sched.add_job(prices, "cron", day_of_week="mon-fri", hour=int(ph), minute=int(pm))
     hh, mm = s.schedule.tracker_at.split(":")
     sched.add_job(poll, "interval", minutes=s.schedule.poll_minutes, next_run_time=datetime.now(tz),
                   max_instances=1, coalesce=True)

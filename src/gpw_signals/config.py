@@ -34,7 +34,8 @@ class ScheduleConfig(BaseModel):
     poll_minutes: int = 5
     active_from: str = "08:00"
     active_to: str = "17:10"
-    tracker_at: str = "17:30"
+    prices_at: str = "18:15"     # import dziennego pliku z archiwum GPW (po publikacji)
+    tracker_at: str = "18:30"   # po imporcie notowań
     holidays: list[str] = Field(default_factory=list)
 
 
@@ -42,6 +43,14 @@ class MarketConfig(BaseModel):
     provider: str = "stooq"
     stooq_url: str = "https://stooq.pl/q/d/l/?s={symbol}&i=d"
     csv_dir: str = "data/prices"
+    # Archiwum GPW (darmowe dane dzienne) – import do csv_dir
+    gpw_archive_url: str = "https://www.gpw.pl/archiwum-notowan?fetch=1&type={type}&instrument=&date={date}"
+    raw_dir: str = "data/raw/gpw"
+    min_interval_s: float = 1.5
+    index_symbols: dict[str, str] = Field(default_factory=lambda: {"WIG20": "wig20", "WIG": "wig"})
+    # Kontrola jakości danych przed liczeniem poziomów
+    max_data_age_days: int = 5
+    max_jump_pct: float = 40.0
     history_days: int = 250
     index_symbol: str = "wig20"
 

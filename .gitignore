@@ -3,4 +3,7 @@
 __pycache__/
 *.pyc
 data/*.sqlite
+# Notowania i surowe pliki z archiwum GPW – pobierane lokalnie (fetch-prices), nie w repo
+data/prices/
+data/raw/
 .pytest_cache/

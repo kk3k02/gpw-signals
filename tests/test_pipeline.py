@@ -342,3 +342,13 @@ def test_cycle_stats_count_llm_calls_and_skips(make_app, caplog):
         app.run_once()
     assert app.cycle_stats["llm"] == 0 and app.cycle_stats["bez_llm:poziomy"] == 2
     assert "Wywołania LLM: 0, decyzje bez LLM: 2 (poziomy=2)" in caplog.text
+
+
+def test_stale_prices_skip_without_llm(make_app):
+    class StalePrices(FakePrices):
+        def daily(self, symbol, days=250):
+            return make_ohlcv(end="2025-06-30").tail(days)
+
+    n = _news()
+    app = make_app([n], prices=StalePrices())
+    assert "dane – ostatnie notowanie sprzed" in _decision(app, n) and app.assessor.calls == 0

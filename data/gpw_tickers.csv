@@ -1,11 +1,11 @@
-ticker,name,stooq_symbol,sector,aliases
-PKN,ORLEN,pkn,paliwa,ORLEN|PKN ORLEN|Orlen SA
-PKO,PKO BP,pko,banki,PKO BP|PKO Bank Polski|Bank Polski
-PEO,Bank Pekao,peo,banki,Pekao|Bank Pekao
-PZU,PZU,pzu,ubezpieczenia,PZU|Powszechny Zakład Ubezpieczeń
-KGH,KGHM,kgh,surowce,KGHM|KGHM Polska Miedź
-CDR,CD Projekt,cdr,gry,CD Projekt|CD PROJEKT|CDP
-DNP,Dino Polska,dnp,handel,Dino|Dino Polska
-LPP,LPP,lpp,odzież,LPP
-ALE,Allegro,ale,e-commerce,Allegro|Allegro.eu
-PGE,PGE,pge,energetyka,PGE|Polska Grupa Energetyczna
+ticker,name,symbol,isin,sector,aliases
+PKN,ORLEN,pkn,PLPKN0000018,paliwa,ORLEN|PKN ORLEN|Orlen SA
+PKO,PKO BP,pko,PLPKO0000016,banki,PKO BP|PKO Bank Polski|Bank Polski
+PEO,Bank Pekao,peo,PLPEKAO00016,banki,Pekao|Bank Pekao
+PZU,PZU,pzu,PLPZU0000011,ubezpieczenia,PZU|Powszechny Zakład Ubezpieczeń
+KGH,KGHM,kgh,PLKGHM000017,surowce,KGHM|KGHM Polska Miedź
+CDR,CD Projekt,cdr,PLOPTTC00011,gry,CD Projekt|CD PROJEKT|CDP
+DNP,Dino Polska,dnp,PLDINPL00011,handel,Dino|Dino Polska
+LPP,LPP,lpp,PLLPP0000011,odzież,LPP
+ALE,Allegro,ale,LU2237380790,e-commerce,Allegro|Allegro.eu
+PGE,PGE,pge,PLPGER000010,energetyka,PGE|Polska Grupa Energetyczna

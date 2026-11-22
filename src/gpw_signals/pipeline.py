@@ -5,7 +5,7 @@ import logging
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import anthropic
@@ -21,8 +21,10 @@ from .ingest.rss_portals import RssSource
 from .levels.engine import compute_levels
 from .levels.validate import validate_levels
 from .mapping import TickerMap
+from .market import gpw_archive
 from .market.indicators import snapshot
 from .market.prices import PriceProvider, make_provider
+from .market.quality import data_issues
 from .market.regime import Regime, market_regime
 from .models import NewsItem, Signal, SignalStatus
 from .publish.formatter import format_outcome, format_signal
@@ -151,9 +153,13 @@ class App:
         if self.db.has_recent_signal(ticker, self.clock() - timedelta(days=f.cooldown_days)):
             return self._skip("cooldown", f"{ticker}: cooldown")
         try:
-            df = self.prices.daily(company.stooq_symbol, self.settings.market.history_days)
+            df = self.prices.daily(company.symbol, self.settings.market.history_days)
         except Exception as e:
             raise TransientError(f"{ticker}: brak notowań ({e})") from e
+        m = self.settings.market
+        issues = data_issues(df, market_date(self.clock(), self.tz), m.max_data_age_days, m.max_jump_pct)
+        if issues:
+            return self._skip("dane", f"{ticker}: dane – {'; '.join(issues)}")
         try:
             snap = snapshot(df, self.settings.levels.atr_period,
                             self.settings.levels.swing_window, self.settings.levels.swing_lookback)
@@ -234,6 +240,16 @@ class App:
                 sent += 1
         return sent
 
+    # ---------------------------------------------------------------- notowania
+    def sync_prices(self, start: date | None = None, end: date | None = None) -> gpw_archive.ImportSummary:
+        """Import notowań dziennych z archiwum GPW do csv_dir (tylko spółki z listy + indeksy)."""
+        m = self.settings.market
+        client = gpw_archive.GpwArchiveClient(m.raw_dir, m.gpw_archive_url, m.min_interval_s)
+        store = gpw_archive.PriceStore(m.csv_dir)
+        shares = {c.isin: c.symbol for c in self.tickers.by_isin().values()}
+        return gpw_archive.sync(client, store, shares, m.index_symbols, market_date(self.clock(), self.tz),
+                                m.history_days, self.settings.schedule.holidays, start, end)
+
     def _regime(self) -> Regime:
         try:
             return market_regime(self.prices.daily(self.settings.market.index_symbol, 260))
@@ -246,7 +262,7 @@ class App:
         for s in self.db.open_signals():
             company = self.tickers.get(s.ticker)
             try:
-                bars = self.prices.daily(company.stooq_symbol, 60)
+                bars = self.prices.daily(company.symbol, 60)
             except Exception as e:  # noqa: BLE001
                 log.warning("Tracker %s: %s", s.ticker, e)
                 continue
