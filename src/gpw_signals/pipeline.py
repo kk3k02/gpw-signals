@@ -27,6 +27,7 @@ from .market.prices import PriceProvider, make_provider
 from .market.quality import data_issues
 from .market.regime import Regime, market_regime
 from .models import NewsItem, Signal, SignalStatus
+from .prefilter import noise_reason
 from .publish.formatter import format_outcome, format_signal, format_weekly_summary
 from .publish.telegram import DryRunPublisher, Publisher, TelegramPublisher
 from .scoring import pre_agent_check, score_signal
@@ -65,6 +66,9 @@ class App:
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.settings.timezone)
 
+    def today(self) -> date:
+        return market_date(self.clock(), self.tz)
+
     def signals_today(self) -> int:
         """Sygnały z bieżącego dnia w strefie rynku – niezależnie od strefy serwera."""
         return self.db.count_signals_between(*market_day_bounds(market_date(self.clock(), self.tz), self.tz))
@@ -87,6 +91,7 @@ class App:
             publisher = TelegramPublisher(sec.telegram_bot_token, chat)
         app = cls(settings, db, tickers, prices, calendar, sources, publisher)
         app.assessor = NewsAssessor(settings.agent, ToolContext(prices, tickers, db, calendar))
+        app.assessor.on_usage = lambda model, u: db.add_usage(app.today(), model, u)
         return app
 
     # ---------------------------------------------------------------- newsy
@@ -112,9 +117,11 @@ class App:
         for n in queue:
             if now - n.published_at > max_age:
                 self.db.mark_news(n.uid, "nieaktualny")
+                self.cycle_stats["news:nieaktualny"] += 1
                 continue
             if not n.tickers:
                 self.db.mark_news(n.uid, "brak tickera")
+                self.cycle_stats["news:brak tickera"] += 1
                 continue
             if self.signals_today() >= self.settings.filters.max_signals_per_day:
                 log.info("Osiągnięto dzienny limit sygnałów – reszta kolejki czeka")
@@ -142,6 +149,7 @@ class App:
                 continue
             self.db.mark_news(n.uid, " | ".join(decisions))
         self._log_cycle_stats()
+        self.db.add_stage_counts(self.today(), self.cycle_stats)
         return published
 
     def process(self, n: NewsItem, ticker: str, regime: Regime) -> tuple[Signal | None, str]:
@@ -151,6 +159,9 @@ class App:
         company = self.tickers.get(ticker)
         if company is None:
             return None, f"{ticker}: nieznany ticker"
+        noise = noise_reason(n, self.settings.prefilter)
+        if noise:
+            return self._skip("szum", f"{ticker}: szum – {noise}")
         if self.db.has_recent_signal(ticker, self.clock() - timedelta(days=f.cooldown_days)):
             return self._skip("cooldown", f"{ticker}: cooldown")
         try:
@@ -183,6 +194,7 @@ class App:
             a = self.assessor.assess(n, ticker, company.name)
         except AgentError as e:  # odmowa, przekroczone limity – ponowienie nic nie da
             log.warning("Agent %s: %s", ticker, e)
+            self.cycle_stats["po_llm:błąd agenta"] += 1
             return None, f"{ticker}: agent – {e}"
         except Exception as e:
             if _is_transient_api_error(e):
@@ -194,6 +206,7 @@ class App:
                               ticker, today=market_date(self.clock(), self.tz)))
         if not sr.passed:
             log.info("%s odrzucony: %s", ticker, sr.rejections)
+            self.cycle_stats["po_llm:odrzucony"] += 1
             return None, f"{ticker}: odrzucony – {'; '.join(sr.rejections)}"
 
         # #2: najpierw zapis (status pending_publish), dopiero potem wysyłka. Dzięki temu sygnał
@@ -202,6 +215,7 @@ class App:
                      assessment=a, news_uid=n.uid, created_at=self.clock(),
                      status=SignalStatus.PENDING_PUBLISH)
         self.db.insert_signal(sig)
+        self.cycle_stats["sygnał"] += 1
         if self._publish(sig):
             return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f}"
         return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} – publikacja do ponowienia"

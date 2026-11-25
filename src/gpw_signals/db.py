@@ -6,6 +6,7 @@ import sqlite3
 from datetime import date, datetime
 from pathlib import Path
 
+from .agent.usage import TokenUsage
 from .clock import from_iso, to_iso
 from .models import Assessment, Levels, NewsItem, Signal, SignalStatus, SourceKind
 
@@ -24,6 +25,13 @@ CREATE TABLE IF NOT EXISTS signals (
     score REAL, assessment TEXT, status TEXT, horizon_days INTEGER,
     telegram_message_id INTEGER, closed_at TEXT,
     close_reason TEXT, result_r REAL, result_pct REAL, last_outcome_on TEXT
+);
+CREATE TABLE IF NOT EXISTS llm_usage (
+    day TEXT, model TEXT, requests INTEGER, input INTEGER, output INTEGER, cache_read INTEGER, cache_write INTEGER,
+    PRIMARY KEY (day, model)
+);
+CREATE TABLE IF NOT EXISTS stage_counts (
+    day TEXT, stage TEXT, n INTEGER, PRIMARY KEY (day, stage)
 );
 CREATE INDEX IF NOT EXISTS ix_signals_ticker ON signals(ticker, created_at);
 CREATE INDEX IF NOT EXISTS ix_news_pending ON news(processed, published_at);
@@ -120,6 +128,38 @@ class Database:
             "SELECT title, kind, published_at, summary FROM news WHERE tickers LIKE ? "
             "ORDER BY published_at DESC LIMIT ?", (f'%"{ticker}"%', limit)).fetchall()
         return [dict(r) for r in rows]
+
+    # --- liczniki dzienne (#6) ---
+    def add_usage(self, day: date, model: str, u: TokenUsage) -> None:
+        self.conn.execute(
+            "INSERT INTO llm_usage VALUES (?,?,1,?,?,?,?) ON CONFLICT(day, model) DO UPDATE SET"
+            " requests=requests+1, input=input+excluded.input, output=output+excluded.output,"
+            " cache_read=cache_read+excluded.cache_read, cache_write=cache_write+excluded.cache_write",
+            (day.isoformat(), model, u.input, u.output, u.cache_read, u.cache_write))
+        self.conn.commit()
+
+    def add_stage_counts(self, day: date, counts: dict[str, int]) -> None:
+        self.conn.executemany(
+            "INSERT INTO stage_counts VALUES (?,?,?) ON CONFLICT(day, stage) DO UPDATE SET n=n+excluded.n",
+            [(day.isoformat(), k, n) for k, n in counts.items()])
+        self.conn.commit()
+
+    def daily_report(self, limit: int = 14) -> list[dict]:
+        """Najnowsze dni: decyzje wg etapu, tokeny i szacowany koszt (None, gdy model spoza cennika)."""
+        days = [r[0] for r in self.conn.execute(
+            "SELECT day FROM stage_counts UNION SELECT day FROM llm_usage ORDER BY day DESC LIMIT ?", (limit,))]
+        out = []
+        for day in days:
+            stages = {r["stage"]: r["n"] for r in self.conn.execute(
+                "SELECT stage, n FROM stage_counts WHERE day=? ORDER BY stage", (day,))}
+            models, costs = {}, []
+            for r in self.conn.execute("SELECT * FROM llm_usage WHERE day=?", (day,)):
+                u = TokenUsage(r["input"], r["output"], r["cache_read"], r["cache_write"])
+                models[r["model"]] = {"requests": r["requests"], **u.__dict__}
+                costs.append(u.cost_usd(r["model"]))
+            out.append({"day": day, "stages": stages, "models": models,
+                        "cost_usd": None if None in costs else round(sum(costs), 4)})
+        return out
 
     # --- signals ---
     def insert_signal(self, s: Signal) -> int:

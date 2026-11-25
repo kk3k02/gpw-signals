@@ -94,6 +94,11 @@ class ProcessingConfig(BaseModel):
     max_attempts: int = 3              # ile razy ponawiać news po błędzie przejściowym
 
 
+class PrefilterConfig(BaseModel):
+    enabled: bool = True
+    min_insider_value_pln: float = 200_000  # mniejsze transakcje osób blisko związanych = szum
+
+
 class PublishConfig(BaseModel):
     enabled: bool = True
     max_pending_minutes: int = 60      # po tym czasie nieopublikowany sygnał nie jest już wysyłany
@@ -121,6 +126,7 @@ class Settings(BaseModel):
     levels: LevelsConfig = Field(default_factory=LevelsConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
+    prefilter: PrefilterConfig = Field(default_factory=PrefilterConfig)
     tracker: TrackerConfig = Field(default_factory=TrackerConfig)
     publish: PublishConfig = Field(default_factory=PublishConfig)
     secrets: Secrets = Field(default_factory=Secrets)
