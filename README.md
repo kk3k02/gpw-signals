@@ -47,7 +47,7 @@ python -m gpw_signals stats
   - komunikat ESPI dotyczy tylko emitenta z tytułu ("EMITENT: temat"), nie kontrahentów z treści,
   - wiadomości z portali są mapowane tylko po tytule, bo lead często wymienia spółki poboczne,
   - skróty i nazwy skrócone dopasowujemy tylko WIELKIMI literami; jakość mierzy `tests/test_mapping.py` na oznaczonych tytułach z `tests/fixtures/mapping_cases.yaml`.
-- **Krok notowań:** `market/tick_size.py` to tabela uproszczona. Na GPW krok zależy też od pasma płynności.
+- **Krok notowań:** tabela RTS 11 (MiFID II) w `market/tick_size.py`; pasmo płynności spółki to kolumna `liquidity_band` w `gpw_tickers.csv`. Pasma zmieniają się co roku 1 kwietnia: odśwież je przez `python -m gpw_signals update-ticks` (rejestr ESMA FITRS), także po `build-tickers`.
 - **Kalendarz:** święta GPW w `settings.yaml` oraz kalendarz wyników w `data/macro_calendar.yaml`.
 - **Prawo:** publiczne sygnały kup/cel/SL to w UE rekomendacje inwestycyjne (MAR art. 20, rozporządzenie 2016/958, nadzór KNF). Przed uruchomieniem publicznego kanału skonsultuj się z prawnikiem.
 - Na start `publish.use_test_channel: true`. Kanał docelowy włączaj dopiero po okresie testów i analizie `stats`.

@@ -167,7 +167,7 @@ class App:
             return self._skip("historia", f"{ticker}: {e}")
 
         # #5: wszystko, co nie zależy od oceny agenta, sprawdzamy PRZED kosztownym wywołaniem LLM
-        lr = compute_levels(snap, self.settings.levels)
+        lr = compute_levels(snap, self.settings.levels, company.liquidity_band)
         if lr.levels is None:
             return self._skip("poziomy", f"{ticker}: poziomy – {lr.reason}")
         errors = validate_levels(lr.levels, f.min_rr_t1)

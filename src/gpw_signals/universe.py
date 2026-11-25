@@ -76,7 +76,7 @@ def update_universe(existing: list[dict], archive: pd.DataFrame) -> UniverseUpda
             upd.skipped_conflicts.append(f"{short} ({isin})")
             continue
         rows.append({"ticker": ticker, "name": short, "symbol": symbol, "isin": isin, "short_name": short,
-                     "sector": "", "aliases": ""})
+                     "sector": "", "aliases": "", "liquidity_band": ""})
         tickers.add(ticker)
         symbols.add(symbol)
         upd.added.append(ticker)

@@ -14,17 +14,18 @@ from .config import LevelsConfig
 from .levels.engine import compute_levels
 from .levels.validate import validate_levels
 from .market.indicators import snapshot
+from .market.tick_size import DEFAULT_BAND
 from .models import Assessment, Signal
 from .tracker.outcomes import evaluate
 
 
 def backtest_levels(df: pd.DataFrame, cfg: LevelsConfig, horizon: int = 10, step: int = 5,
-                    warmup: int = 60) -> Counter:
+                    warmup: int = 60, band: int = DEFAULT_BAND) -> Counter:
     stats: Counter = Counter()
     dummy = Assessment("X", True, "long", "inne", 0.5, horizon, False, "")
     for i in range(warmup, len(df) - 1, step):
         hist, future = df.iloc[: i + 1], df.iloc[i + 1: i + 1 + horizon]
-        lr = compute_levels(snapshot(hist, cfg.atr_period, cfg.swing_window, cfg.swing_lookback), cfg)
+        lr = compute_levels(snapshot(hist, cfg.atr_period, cfg.swing_window, cfg.swing_lookback), cfg, band)
         if lr.levels is None or validate_levels(lr.levels):
             stats["skipped"] += 1
             continue

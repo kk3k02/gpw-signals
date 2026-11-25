@@ -1,7 +1,6 @@
 from gpw_signals.levels.engine import compute_levels
 from gpw_signals.levels.validate import validate_levels
 from gpw_signals.market.indicators import Snapshot, snapshot
-from gpw_signals.market.tick_size import round_down, round_up, tick_for
 from gpw_signals.models import Levels
 
 
@@ -19,8 +18,8 @@ def test_levels_basic_ordering(lcfg):
     assert lv is not None, lr.reason
     assert lv.stop_loss < lv.entry_min <= lv.entry_max < lv.targets[0] < lv.targets[1] < lv.targets[2]
     assert validate_levels(lv) == []
-    # entry 99.4-100.4 (tick 0.05 >= 100), SL = 99.4 - 3.0 = 96.4
-    assert lv.entry_min == 99.40 and lv.entry_max == 100.40
+    # entry 99.4-100.5 (pasmo 2: tick 0.2 < 100, 0.5 >= 100), SL = 99.4 - 3.0 = 96.4
+    assert lv.entry_min == 99.40 and lv.entry_max == 100.50
     assert lv.stop_loss == 96.40
 
 
@@ -56,9 +55,3 @@ def test_validate_rejects_bad_order():
 def test_validate_rr():
     errs = validate_levels(Levels(10, 10, [10.5, 11, 12], 9), min_rr_t1=1.0)
     assert any("R:R" in e for e in errs)
-
-
-def test_tick_rounding():
-    assert tick_for(0.5) == 0.001 and tick_for(75) == 0.02
-    assert round_down(75.031) == 75.02 and round_up(75.001) == 75.02
-    assert round_down(3.0) == 3.0
