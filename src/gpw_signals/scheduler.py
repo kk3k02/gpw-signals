@@ -43,6 +43,12 @@ def run_forever(app: App) -> None:
             except Exception:
                 log.exception("Błąd trackera")
 
+    def weekly() -> None:
+        try:
+            app.weekly_summary()
+        except Exception:
+            log.exception("Błąd podsumowania tygodnia")
+
     def prices() -> None:
         if is_session_day(datetime.now(tz).date(), s.schedule.holidays):
             try:
@@ -62,6 +68,9 @@ def run_forever(app: App) -> None:
     sched.add_job(poll, "interval", minutes=s.schedule.poll_minutes, next_run_time=datetime.now(tz),
                   max_instances=1, coalesce=True)
     sched.add_job(track, "cron", day_of_week="mon-fri", hour=int(hh), minute=int(mm))
+    if s.tracker.weekly_summary:
+        wh, wm = s.tracker.weekly_summary_at.split(":")
+        sched.add_job(weekly, "cron", day_of_week=s.tracker.weekly_summary_day, hour=int(wh), minute=int(wm))
     log.info("Start schedulera (co %d min, %s–%s)", s.schedule.poll_minutes,
              s.schedule.active_from, s.schedule.active_to)
     sched.start()

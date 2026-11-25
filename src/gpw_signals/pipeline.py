@@ -27,10 +27,11 @@ from .market.prices import PriceProvider, make_provider
 from .market.quality import data_issues
 from .market.regime import Regime, market_regime
 from .models import NewsItem, Signal, SignalStatus
-from .publish.formatter import format_outcome, format_signal
+from .publish.formatter import format_outcome, format_signal, format_weekly_summary
 from .publish.telegram import DryRunPublisher, Publisher, TelegramPublisher
 from .scoring import pre_agent_check, score_signal
 from .tracker.outcomes import evaluate
+from .tracker.stats import summarize
 
 log = logging.getLogger(__name__)
 
@@ -259,6 +260,7 @@ class App:
 
     # ---------------------------------------------------------------- tracker
     def track(self) -> None:
+        today = market_date(self.clock(), self.tz)
         for s in self.db.open_signals():
             company = self.tickers.get(s.ticker)
             try:
@@ -266,9 +268,24 @@ class App:
             except Exception as e:  # noqa: BLE001
                 log.warning("Tracker %s: %s", s.ticker, e)
                 continue
-            out = evaluate(s, bars, self.tz)
-            if out.status != s.status or out.closed:
-                if out.status != s.status and out.status != SignalStatus.ACTIVE \
-                        and self.settings.publish.post_outcomes:
-                    self.publisher.send(format_outcome(s, out.status), reply_to=s.telegram_message_id)
-                self.db.update_signal_status(s.id, out.status, closed_at=self.clock() if out.closed else None)
+            out = evaluate(s, bars, self.tz, self.settings.tracker.breakeven_after_t1)
+            if out.status == s.status and not out.closed:
+                continue
+            if self.db.outcome_recorded_on(s.id, today):
+                continue  # jedna aktualizacja dziennie – zmianę zobaczy przebieg następnego dnia
+            if (out.closed or out.status != SignalStatus.ACTIVE) and self.settings.publish.post_outcomes:
+                try:
+                    self.publisher.send(format_outcome(s, out), reply_to=s.telegram_message_id)
+                except Exception as e:  # noqa: BLE001 – bez zapisu, więc ponowi kolejny przebieg
+                    log.warning("Wynik sygnału %s (%s) nieopublikowany: %s", s.id, s.ticker, e)
+                    continue
+            self.db.record_outcome(s.id, out.status, today, self.clock() if out.closed else None,
+                                   out.reason, out.result_r, out.result_pct)
+
+    def weekly_summary(self) -> bool:
+        """Podsumowanie sygnałów zamkniętych w ostatnich 7 dniach. False = nie było czego wysłać."""
+        rows = self.db.closed_signals_since(self.clock() - timedelta(days=7))
+        if not rows:
+            return False
+        self.publisher.send(format_weekly_summary(summarize(rows)["all"]))
+        return True

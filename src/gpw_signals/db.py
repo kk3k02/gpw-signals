@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from .clock import from_iso, to_iso
@@ -22,14 +22,17 @@ CREATE TABLE IF NOT EXISTS signals (
     ticker TEXT, company_name TEXT, created_at TEXT, news_uid TEXT,
     entry_min REAL, entry_max REAL, t1 REAL, t2 REAL, t3 REAL, stop_loss REAL,
     score REAL, assessment TEXT, status TEXT, horizon_days INTEGER,
-    telegram_message_id INTEGER, closed_at TEXT
+    telegram_message_id INTEGER, closed_at TEXT,
+    close_reason TEXT, result_r REAL, result_pct REAL, last_outcome_on TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_signals_ticker ON signals(ticker, created_at);
 CREATE INDEX IF NOT EXISTS ix_news_pending ON news(processed, published_at);
 """
 
 # Kolumny dodane po pierwszej wersji schematu – dopisywane do istniejących baz
-_MIGRATIONS = {"news": {"attempts": "INTEGER DEFAULT 0", "last_error": "TEXT"}}
+_MIGRATIONS = {"news": {"attempts": "INTEGER DEFAULT 0", "last_error": "TEXT"},
+               "signals": {"close_reason": "TEXT", "result_r": "REAL", "result_pct": "REAL",
+                           "last_outcome_on": "TEXT"}}
 
 # Wersja formatu danych (PRAGMA user_version). 1 = wszystkie daty w UTC w formacie clock.to_iso.
 _DATA_VERSION = 1
@@ -139,6 +142,26 @@ class Database:
             "UPDATE signals SET status=?, closed_at=? WHERE id=?",
             (status.value, to_iso(closed_at) if closed_at else None, signal_id))
         self.conn.commit()
+
+    def record_outcome(self, signal_id: int, status: SignalStatus, on: date, closed_at: datetime | None = None,
+                       reason: str | None = None, result_r: float | None = None,
+                       result_pct: float | None = None) -> None:
+        """Zmiana wyniku z trackera; `on` = dzień rynku, w którym ją zapisano (maks. jedna dziennie)."""
+        self.conn.execute(
+            "UPDATE signals SET status=?, closed_at=?, close_reason=?, result_r=?, result_pct=?, last_outcome_on=?"
+            " WHERE id=?",
+            (status.value, to_iso(closed_at) if closed_at else None, reason, result_r, result_pct,
+             on.isoformat(), signal_id))
+        self.conn.commit()
+
+    def outcome_recorded_on(self, signal_id: int, day: date) -> bool:
+        return self.conn.execute("SELECT 1 FROM signals WHERE id=? AND last_outcome_on=?",
+                                 (signal_id, day.isoformat())).fetchone() is not None
+
+    def closed_signals_since(self, since: datetime) -> list[sqlite3.Row]:
+        """Opublikowane sygnały zamknięte od `since`."""
+        return self.conn.execute("SELECT * FROM signals WHERE closed_at>=? AND status<>? ORDER BY closed_at",
+                                 (to_iso(since), SignalStatus.UNPUBLISHED.value)).fetchall()
 
     def mark_published(self, signal_id: int, message_id: int | None) -> None:
         self.conn.execute("UPDATE signals SET telegram_message_id=?, status=? WHERE id=?",

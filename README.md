@@ -18,6 +18,7 @@ RSS/ESPI → dedup (SQLite) → mapowanie na ticker → pre-filtr płynności
   → agent Claude (ocena + narzędzia do danych, bez cen) → silnik poziomów (ATR, swingi, R)
   → walidacja → scoring/filtry (trend, wolumen, reżim WIG20, wyniki, cooldown) → Telegram
 Tracker po sesji: T1/T2/T3/SL/wygaśnięcie → odpowiedź pod sygnałem + statystyki
+  (wynik w R i %: po 1/3 pozycji na T1–T3, wejście po środku strefy, bez prowizji; opcje w sekcji `tracker`)
 ```
 
 ## Start

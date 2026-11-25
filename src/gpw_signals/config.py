@@ -103,6 +103,13 @@ class PublishConfig(BaseModel):
     disclaimer: str = ""
 
 
+class TrackerConfig(BaseModel):
+    breakeven_after_t1: bool = False   # po T1 stop na środek strefy wejścia (od następnej sesji)
+    weekly_summary: bool = False       # podsumowanie skuteczności na kanale
+    weekly_summary_day: str = "fri"
+    weekly_summary_at: str = "19:00"
+
+
 class Settings(BaseModel):
     db_path: str = "data/gpw_signals.sqlite"
     tickers_csv: str = "data/gpw_tickers.csv"
@@ -114,6 +121,7 @@ class Settings(BaseModel):
     levels: LevelsConfig = Field(default_factory=LevelsConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
+    tracker: TrackerConfig = Field(default_factory=TrackerConfig)
     publish: PublishConfig = Field(default_factory=PublishConfig)
     secrets: Secrets = Field(default_factory=Secrets)
 
