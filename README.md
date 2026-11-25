@@ -53,3 +53,17 @@ python -m gpw_signals usage                # newsy wg etapu, tokeny i szacowany 
 - **Kalendarz:** dni bez sesji 2026–2027 są w `settings.yaml` (z gpw.pl; brak kolejnego roku bot zgłosi w logu od grudnia). Terminy raportów spółek bot może czytać z komunikatów ESPI do `data/report_calendar.yaml` (`sources.fetch_report_schedules`, domyślnie wyłączone: najpierw sprawdź regulamin serwisu). RPP, GUS i terminy sprzed włączenia dopisz ręcznie w `data/macro_calendar.yaml`.
 - **Prawo:** publiczne sygnały kup/cel/SL to w UE rekomendacje inwestycyjne (MAR art. 20, rozporządzenie 2016/958, nadzór KNF). Przed uruchomieniem publicznego kanału skonsultuj się z prawnikiem.
 - Na start `publish.use_test_channel: true`. Kanał docelowy włączaj dopiero po okresie testów i analizie `stats`.
+
+## Lokalny model (Ollama)
+
+Zamiast API Anthropic newsy może oceniać lokalny model, bez kosztów API i bez `ANTHROPIC_API_KEY`:
+
+1. Zainstaluj [Ollama](https://ollama.com/download) i pobierz model (`ollama pull <model>`), np. polski
+   [Bielik](https://ollama.com/SpeakLeash). Modele 7–14B wymagają orientacyjnie 8–16 GB VRAM; na CPU działają wolniej.
+2. W `config/settings.yaml` ustaw `agent.provider: ollama` i `agent.model: <model>`. Z Dockera serwer na hoście
+   to zwykle `base_url: http://host.docker.internal:11434`.
+3. Przed użyciem porównaj jakość: `python -m gpw_signals eval-agent --provider ollama --model <model>`
+   (przypadki: `data/eval/agent_cases.yaml`; z `--provider anthropic` wywołania są płatne).
+
+Model lokalny dostaje jedno zapytanie z danymi w treści (bez narzędzi). Niepoprawna odpowiedź = brak sygnału,
+niedostępny serwer = news wraca do kolejki.

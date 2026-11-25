@@ -116,7 +116,7 @@ def test_transient_api_error_is_retried(make_app):
     app = make_app([n], assessor=FakeAssessor(err))
     assert app.run_once() == []
     row = _row(app, n)
-    assert row["processed"] == 0 and row["attempts"] == 1 and "API Claude" in row["last_error"]
+    assert row["processed"] == 0 and row["attempts"] == 1 and "APIConnectionError" in row["last_error"]
 
     sigs = app.run_once()  # news nie przychodzi już z RSS, ale wraca z kolejki w bazie
     assert len(sigs) == 1 and app.assessor.calls == 2

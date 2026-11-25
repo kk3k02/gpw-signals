@@ -68,11 +68,15 @@ market:
   index_symbol: "wig20"
 
 agent:
-  model: claude-opus-5-5
+  provider: anthropic            # anthropic | ollama (lokalny model, bez kosztów API)
+  model: claude-opus-5-5         # dla ollama np. SpeakLeash/bielik-11b-v3.0-instruct:<tag>
   effort: high                   # low | medium | high | xhigh | max
   max_tokens: 16000
   max_tool_rounds: 8
   use_fallbacks: true            # serwerowy fallback przy odmowie modelu
+  base_url: "http://localhost:11434"  # poniżej tylko dla ollama
+  num_ctx: 8192
+  timeout_s: 300
 
 levels:
   atr_period: 14
