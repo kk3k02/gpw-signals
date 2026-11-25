@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from .config import ScheduleConfig
 from .pipeline import App
 
 log = logging.getLogger(__name__)
@@ -20,6 +21,16 @@ def in_active_window(now: datetime, start: str, end: str) -> bool:
     return time.fromisoformat(start) <= now.time() <= time.fromisoformat(end)
 
 
+def should_poll(now: datetime, cfg: ScheduleConfig) -> bool:
+    return is_session_day(now.date(), cfg.holidays) and in_active_window(now, cfg.active_from, cfg.active_to)
+
+
+def missing_holiday_years(today: date, holidays: list[str]) -> list[int]:
+    """Lata bez wpisanych dni bez sesji: bieżący, a od grudnia także następny."""
+    years = [today.year, today.year + 1] if today.month == 12 else [today.year]
+    return [y for y in years if not any(h.startswith(f"{y}-") for h in holidays)]
+
+
 def run_forever(app: App) -> None:
     s = app.settings
     tz = ZoneInfo(s.timezone)
@@ -27,8 +38,7 @@ def run_forever(app: App) -> None:
 
     def poll() -> None:
         now = datetime.now(tz)
-        if not is_session_day(now.date(), s.schedule.holidays) or not in_active_window(
-                now, s.schedule.active_from, s.schedule.active_to):
+        if not should_poll(now, s.schedule):
             return
         try:
             sigs = app.run_once()
@@ -55,6 +65,9 @@ def run_forever(app: App) -> None:
                 app.sync_prices()
             except Exception:
                 log.exception("Błąd importu notowań")
+
+    for year in missing_holiday_years(datetime.now(tz).date(), s.schedule.holidays):
+        log.warning("Brak dni bez sesji na rok %d – uzupełnij schedule.holidays", year)
 
     # Na starcie dociągamy zaległe notowania (np. po przerwie w działaniu bota)
     try:

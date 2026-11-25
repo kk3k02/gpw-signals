@@ -1,6 +1,7 @@
 """Kalendarz makro i wyników spółek (plik YAML). Służy agentowi i filtrowi „wyniki tuż-tuż”."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import date, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -11,12 +12,20 @@ from ..clock import MARKET_TZ, market_date, utc_now
 
 
 class EventCalendar:
-    def __init__(self, path: str | Path, tz: ZoneInfo = MARKET_TZ):
+    def __init__(self, path: str | Path, tz: ZoneInfo = MARKET_TZ, extra: Iterable[str | Path] = ()):
+        """`extra`: dodatkowe pliki w tym samym formacie (np. generowane terminy raportów)."""
         self.tz = tz
-        p = Path(path)
-        raw = yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {}
-        self.events: dict[date, list[str]] = {
-            date.fromisoformat(str(k)): list(v or []) for k, v in (raw or {}).items()}
+        self._paths = [Path(p) for p in (path, *extra)]
+        self.events: dict[date, list[str]] = {}
+        self.reload()
+
+    def reload(self) -> None:
+        events: dict[date, list[str]] = {}
+        for p in self._paths:
+            raw = yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {}
+            for k, v in (raw or {}).items():
+                events.setdefault(date.fromisoformat(str(k)), []).extend(v or [])
+        self.events = events
 
     def upcoming(self, days: int = 14, ticker: str | None = None, today: date | None = None) -> list[dict]:
         today = today or market_date(utc_now(), self.tz)

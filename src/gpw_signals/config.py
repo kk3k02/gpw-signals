@@ -28,6 +28,8 @@ class SourcesConfig(BaseModel):
     rss: list[FeedConfig] = Field(default_factory=list)
     broker_keywords: list[str] = Field(default_factory=list)
     macro_calendar_file: str = "data/macro_calendar.yaml"
+    fetch_report_schedules: bool = False   # pobieranie treści komunikatów z terminami raportów okresowych
+    report_calendar_file: str = "data/report_calendar.yaml"
 
 
 class ScheduleConfig(BaseModel):
