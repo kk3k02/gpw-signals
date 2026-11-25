@@ -15,6 +15,7 @@ class Secrets(BaseSettings):
     telegram_bot_token: str = ""
     telegram_channel_id: str = ""
     telegram_test_channel_id: str = ""
+    telegram_admin_chat_id: str = ""   # prywatny czat na alerty i raport dzienny
 
 
 class FeedConfig(BaseModel):
@@ -117,6 +118,21 @@ class TrackerConfig(BaseModel):
     weekly_summary_at: str = "19:00"
 
 
+class MonitoringConfig(BaseModel):
+    fail_threshold: int = 3            # alert po tylu awariach z rzędu
+    heartbeat_file: str = "data/heartbeat"
+    max_heartbeat_age_min: int = 30    # starszy znacznik = kontener "unhealthy"
+    daily_report: bool = True
+    daily_report_at: str = "19:15"     # po trackerze
+
+
+class LoggingConfig(BaseModel):
+    json_format: bool = False
+    file: str = ""                     # "" = tylko konsola; plik zapisuje wyłącznie `run`
+    max_mb: float = 10.0
+    backups: int = 5
+
+
 class Settings(BaseModel):
     db_path: str = "data/gpw_signals.sqlite"
     tickers_csv: str = "data/gpw_tickers.csv"
@@ -130,6 +146,8 @@ class Settings(BaseModel):
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     prefilter: PrefilterConfig = Field(default_factory=PrefilterConfig)
     tracker: TrackerConfig = Field(default_factory=TrackerConfig)
+    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
     publish: PublishConfig = Field(default_factory=PublishConfig)
     secrets: Secrets = Field(default_factory=Secrets)
 

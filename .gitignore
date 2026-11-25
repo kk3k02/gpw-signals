@@ -8,4 +8,7 @@ data/prices/
 data/raw/
 # Terminy raportów generowane z komunikatów ESPI
 data/report_calendar.yaml
+# Logi i znacznik życia bota
+data/logs/
+data/heartbeat*
 .pytest_cache/
