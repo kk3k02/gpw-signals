@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 
 import anthropic
 
@@ -10,6 +11,7 @@ from ..config import AgentConfig
 from ..models import Assessment, NewsItem
 from .prompts import SYSTEM_PROMPT, USER_TEMPLATE
 from .tools import TOOL_DEFINITIONS, ToolContext
+from .usage import TokenUsage
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +46,8 @@ class NewsAssessor:
     def __init__(self, cfg: AgentConfig, ctx: ToolContext, client: anthropic.Anthropic | None = None):
         self.cfg, self.ctx = cfg, ctx
         self._client = client
+        # Wołane po każdej odpowiedzi API (także odmowie – też jest płatna): (model, zużycie)
+        self.on_usage: Callable[[str, TokenUsage], None] | None = None
 
     @property
     def client(self) -> anthropic.Anthropic:
@@ -76,6 +80,8 @@ class NewsAssessor:
         for _ in range(self.cfg.max_tool_rounds):
             resp = self._create(messages)
             log.debug("agent stop=%s usage=%s", resp.stop_reason, resp.usage)
+            if self.on_usage and resp.usage is not None:
+                self.on_usage(resp.model, TokenUsage.from_response(resp.usage))
 
             if resp.stop_reason == "refusal":
                 raise AgentError(f"Model odmówił oceny ({getattr(resp, 'stop_details', None)})")

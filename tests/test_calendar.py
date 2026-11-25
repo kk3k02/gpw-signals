@@ -152,7 +152,8 @@ def test_pipeline_imports_schedule_without_llm(tmp_path):
     app, news = _app(tmp_path)
     app.run_once()
     row = app.db.news_row(news.uid)
-    assert row["processed"] and "terminy raportów" in row["decision"]
+    assert row["processed"] and "zapisano 1" in row["decision"]
+    assert app.cycle_stats["news:terminy raportów"] == 1
     assert app.calendar.earnings_within("PKN")      # działa bez restartu
 
 
@@ -171,4 +172,4 @@ def test_pipeline_disabled_does_not_fetch(tmp_path):
     app, news = _app(tmp_path, enabled=False)
     app.run_once()
     assert not app.calendar.events
-    assert "brak notowań" in app.db.news_row(news.uid)["last_error"]
+    assert "szum – terminy raportów" in app.db.news_row(news.uid)["decision"]  # odrzuca pre-filtr (#6)

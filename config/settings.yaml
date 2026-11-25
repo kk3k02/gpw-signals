@@ -102,6 +102,10 @@ processing:
   max_news_age_hours: 12         # nieprzetworzone newsy starsze niż to -> "nieaktualny"
   max_attempts: 3                # ponowienia po błędach przejściowych (API, sieć, notowania)
 
+prefilter:                       # szum ESPI odrzucany przed agentem (reguły: prefilter.py)
+  enabled: true
+  min_insider_value_pln: 200000  # mniejsze transakcje osób blisko związanych = szum
+
 tracker:
   breakeven_after_t1: false      # po T1 stop na środek strefy wejścia (od następnej sesji)
   weekly_summary: false          # tygodniowe podsumowanie skuteczności na kanale
