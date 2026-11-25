@@ -17,6 +17,7 @@ from .config import Settings
 from .db import Database
 from .ingest.base import Source, fetch_all
 from .ingest.macro import EventCalendar
+from .ingest.report_schedule import ReportCalendar, ScheduleError, extract_body, fetch_page, is_report_schedule
 from .ingest.rss_portals import RssSource
 from .levels.engine import compute_levels
 from .levels.validate import validate_levels
@@ -26,7 +27,7 @@ from .market.indicators import snapshot
 from .market.prices import PriceProvider, make_provider
 from .market.quality import data_issues
 from .market.regime import Regime, market_regime
-from .models import NewsItem, Signal, SignalStatus
+from .models import NewsItem, Signal, SignalStatus, SourceKind
 from .prefilter import noise_reason
 from .publish.formatter import format_outcome, format_signal, format_weekly_summary
 from .publish.telegram import DryRunPublisher, Publisher, TelegramPublisher
@@ -57,8 +58,11 @@ class App:
     sources: list[Source]
     publisher: Publisher
     assessor: NewsAssessor | None = None
+    dry_run: bool = False
     # Źródło czasu (aware UTC) – podmieniane w testach
     clock: Callable[[], datetime] = field(default=utc_now)
+    # Pobieranie strony komunikatu (terminy raportów) – podmieniane w testach
+    fetch_page: Callable[[str], str] = field(default=fetch_page)
     # Statystyki ostatniego cyklu: wywołania LLM i decyzje podjęte bez LLM, wg etapu (#5)
     cycle_stats: Counter = field(default_factory=Counter)
 
@@ -81,7 +85,8 @@ class App:
         tickers = TickerMap.from_csv(settings.tickers_csv)
         m = settings.market
         prices = make_provider(m.provider, m.stooq_url, m.csv_dir)
-        calendar = EventCalendar(settings.sources.macro_calendar_file, ZoneInfo(settings.timezone))
+        calendar = EventCalendar(settings.sources.macro_calendar_file, ZoneInfo(settings.timezone),
+                                 extra=[settings.sources.report_calendar_file])
         sources: list[Source] = [RssSource(f, settings.sources.broker_keywords) for f in settings.sources.rss]
         sec = settings.secrets
         if dry_run or not settings.publish.enabled:
@@ -89,7 +94,7 @@ class App:
         else:
             chat = sec.telegram_test_channel_id if settings.publish.use_test_channel else sec.telegram_channel_id
             publisher = TelegramPublisher(sec.telegram_bot_token, chat)
-        app = cls(settings, db, tickers, prices, calendar, sources, publisher)
+        app = cls(settings, db, tickers, prices, calendar, sources, publisher, dry_run=dry_run)
         app.assessor = NewsAssessor(settings.agent, ToolContext(prices, tickers, db, calendar))
         app.assessor.on_usage = lambda model, u: db.add_usage(app.today(), model, u)
         return app
@@ -123,6 +128,14 @@ class App:
                 self.db.mark_news(n.uid, "brak tickera")
                 self.cycle_stats["news:brak tickera"] += 1
                 continue
+            if self._is_schedule(n):
+                try:
+                    self.db.mark_news(n.uid, self._import_schedule(n))
+                    self.cycle_stats["news:terminy raportów"] += 1
+                except Exception as e:  # noqa: BLE001 – sieć/plik: ponowienie do limitu prób
+                    log.warning("Terminy raportów %s: %s", n.tickers[0], e)
+                    self.db.record_failure(n.uid, str(e), pc.max_attempts)
+                continue
             if self.signals_today() >= self.settings.filters.max_signals_per_day:
                 log.info("Osiągnięto dzienny limit sygnałów – reszta kolejki czeka")
                 break
@@ -151,6 +164,24 @@ class App:
         self._log_cycle_stats()
         self.db.add_stage_counts(self.today(), self.cycle_stats)
         return published
+
+    def _is_schedule(self, n: NewsItem) -> bool:
+        # Dry-run ma nie zostawiać śladów, a ten import zapisuje plik
+        return (self.settings.sources.fetch_report_schedules and not self.dry_run
+                and n.kind == SourceKind.ESPI and is_report_schedule(n.title))
+
+    def _import_schedule(self, n: NewsItem) -> str:
+        """Komunikat z terminami raportów trafia do kalendarza, a nie do oceny przez LLM."""
+        ticker = n.tickers[0]
+        body = extract_body(self.fetch_page(n.url))
+        try:
+            dates = ReportCalendar(self.settings.sources.report_calendar_file).import_announcement(
+                ticker, n.title, body, market_date(n.published_at, self.tz))
+        except ScheduleError as e:
+            log.warning("Terminy raportów %s: %s (%s)", ticker, e, n.url)
+            return f"{ticker}: terminy raportów – {e}"
+        self.calendar.reload()
+        return f"{ticker}: terminy raportów – zapisano {len(dates)}"
 
     def process(self, n: NewsItem, ticker: str, regime: Regime) -> tuple[Signal | None, str]:
         """Ocena newsa dla jednej spółki. Zwraca (sygnał | None, decyzja).
