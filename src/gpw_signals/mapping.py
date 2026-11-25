@@ -17,9 +17,10 @@ import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .market.tick_size import BANDS, DEFAULT_BAND
 from .models import SourceKind
 
-CSV_FIELDS = ["ticker", "name", "symbol", "isin", "short_name", "sector", "aliases"]
+CSV_FIELDS = ["ticker", "name", "symbol", "isin", "short_name", "sector", "aliases", "liquidity_band"]
 
 # Formy prawne usuwane z nazwy emitenta przed porównaniem
 _LEGAL = re.compile(
@@ -74,10 +75,13 @@ class Company:
     aliases: list[str]
     isin: str = ""         # klucz w archiwum notowań GPW
     short_name: str = ""   # nazwa skrócona z archiwum GPW, np. PKNORLEN
+    liquidity_band: int = DEFAULT_BAND  # pasmo płynności RTS 11 (krok notowań)
     _patterns: list[re.Pattern] = field(default_factory=list, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         self.short_name = self.short_name.upper()
+        if self.liquidity_band not in BANDS:
+            raise ValueError(f"{self.ticker}: nieznane pasmo płynności {self.liquidity_band}")
         # Nazwy dopasowywane bez względu na wielkość liter: aliasy i pełna nazwa, o ile nie jest
         # tylko nazwą skróconą/tickerem (te dopasowujemy wyłącznie WIELKIMI literami)
         loose = [*self.aliases]
@@ -111,7 +115,8 @@ class TickerMap:
             rows = list(csv.DictReader(f))
         return cls([Company(r["ticker"].upper(), r["name"], r["symbol"], r.get("sector", ""),
                             [a.strip() for a in r.get("aliases", "").split("|") if a.strip()],
-                            r.get("isin", "").strip().upper(), r.get("short_name", "").strip())
+                            r.get("isin", "").strip().upper(), r.get("short_name", "").strip(),
+                            int(r.get("liquidity_band") or DEFAULT_BAND))
                     for r in rows])
 
     def by_isin(self) -> dict[str, Company]:

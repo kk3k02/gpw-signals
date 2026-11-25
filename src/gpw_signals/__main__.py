@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     once.add_argument("--dry-run", action="store_true", help="Drukuj zamiast wysyłać, baza w pamięci")
     sub.add_parser("track", help="Sprawdź wyniki otwartych sygnałów")
     sub.add_parser("build-tickers", help="Uzupełnij data/gpw_tickers.csv o wszystkie spółki z archiwum GPW")
+    sub.add_parser("update-ticks", help="Uzupełnij pasma płynności (krok notowań) z rejestru ESMA")
     fp = sub.add_parser("fetch-prices", help="Import notowań dziennych z archiwum GPW do data/prices")
     fp.add_argument("--from", dest="start", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: od braków)")
     fp.add_argument("--to", dest="end", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: dziś)")
@@ -49,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Sygnałów: {len(sigs)}")
     elif args.cmd == "build-tickers":
         _build_tickers(s)
+    elif args.cmd == "update-ticks":
+        _update_ticks(s)
     elif args.cmd == "fetch-prices":
         # Import notowań nie publikuje ani nie używa bazy sygnałów – nie wymaga tokenu Telegrama
         summary = App.build(s, dry_run=True).sync_prices(args.start, args.end)
@@ -65,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
             for tk in args.tickers:
                 c = app.tickers.get(tk)
                 df = app.prices.daily(c.symbol, 2000)
-                print(tk, dict(backtest_levels(df, s.levels, args.horizon)))
+                print(tk, dict(backtest_levels(df, s.levels, args.horizon, band=c.liquidity_band)))
         else:
             _preview(app, args.ticker)
     return 0
@@ -95,6 +98,38 @@ def _build_tickers(s, sessions: int = 20) -> None:
     print("Teraz zaimportuj notowania nowych spółek z cache: python -m gpw_signals fetch-prices")
 
 
+def _update_ticks(s) -> None:
+    """Pasma płynności obowiązujące dziś. Spółka bez ADNT w rejestrze zachowuje dotychczasową wartość."""
+    from collections import Counter
+
+    from .clock import MARKET_TZ, market_date, utc_now
+    from .market.liquidity import current_bands, fetch_records
+    from .universe import read_rows, write_rows
+
+    today = market_date(utc_now(), MARKET_TZ)
+    last_april = date(today.year - (today.month < 4), 4, 1)
+    rows = read_rows(s.tickers_csv)
+    bands = current_bands(fetch_records(r["isin"] for r in rows if r["isin"]), today)
+    changed, missing, stale = [], [], []
+    for r in rows:
+        if r["isin"] not in bands:
+            missing.append(r["ticker"])
+            continue
+        band, start = bands[r["isin"]]
+        if start < last_april:
+            stale.append(r["ticker"])
+        if r["liquidity_band"] != str(band):
+            changed.append(r["ticker"])
+            r["liquidity_band"] = str(band)
+    write_rows(s.tickers_csv, rows)
+    print(f"Spółek: {len(rows)}, zmienione pasma: {len(changed)}")
+    print("Pasma:", dict(sorted(Counter(r["liquidity_band"] or "brak" for r in rows).items())))
+    if stale:
+        print(f"ADNT sprzed ostatniego 1 kwietnia ({len(stale)}):", ", ".join(stale))
+    if missing:
+        print("Brak ADNT w rejestrze:", ", ".join(missing))
+
+
 def _preview(app, ticker: str) -> None:
     from .clock import utc_now
     from .levels.engine import compute_levels
@@ -105,7 +140,7 @@ def _preview(app, ticker: str) -> None:
 
     c = app.tickers.get(ticker)
     snap = snapshot(app.prices.daily(c.symbol, 260))
-    lr = compute_levels(snap, app.settings.levels)
+    lr = compute_levels(snap, app.settings.levels, c.liquidity_band)
     if lr.levels is None:
         print("Brak poziomów:", lr.reason)
         return
