@@ -83,6 +83,12 @@ processing:
   max_news_age_hours: 12         # nieprzetworzone newsy starsze niż to -> "nieaktualny"
   max_attempts: 3                # ponowienia po błędach przejściowych (API, sieć, notowania)
 
+tracker:
+  breakeven_after_t1: false      # po T1 stop na środek strefy wejścia (od następnej sesji)
+  weekly_summary: false          # tygodniowe podsumowanie skuteczności na kanale
+  weekly_summary_day: fri
+  weekly_summary_at: "19:00"     # po trackerze (schedule.tracker_at)
+
 publish:
   enabled: true                  # wyłącznik awaryjny
   max_pending_minutes: 60        # sygnał nieopublikowany dłużej -> "unpublished", bez wysyłki
