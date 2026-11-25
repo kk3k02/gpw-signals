@@ -14,7 +14,7 @@ StopLoss: 53.94
 ## Przepływ
 
 ```
-RSS/ESPI → dedup (SQLite) → mapowanie na ticker → pre-filtr płynności
+RSS/ESPI → dedup (SQLite) → mapowanie na ticker → pre-filtr szumu i płynności
   → agent Claude (ocena + narzędzia do danych, bez cen) → silnik poziomów (ATR, swingi, R)
   → walidacja → scoring/filtry (trend, wolumen, reżim WIG20, wyniki, cooldown) → Telegram
 Tracker po sesji: T1/T2/T3/SL/wygaśnięcie → odpowiedź pod sygnałem + statystyki
@@ -35,6 +35,7 @@ python -m gpw_signals backtest PKN LPP     # kalibracja silnika poziomów
 python -m gpw_signals once --dry-run       # pełny cykl, druk zamiast wysyłki
 python -m gpw_signals run                  # produkcja (scheduler)
 python -m gpw_signals stats
+python -m gpw_signals usage                # newsy wg etapu, tokeny i szacowany koszt LLM na dzień
 ```
 
 ## Do zrobienia przed produkcją

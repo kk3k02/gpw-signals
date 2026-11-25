@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     fp = sub.add_parser("fetch-prices", help="Import notowań dziennych z archiwum GPW do data/prices")
     fp.add_argument("--from", dest="start", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: od braków)")
     fp.add_argument("--to", dest="end", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: dziś)")
+    sub.add_parser("usage", help="Newsy wg etapu, tokeny i koszt LLM na dzień")
     sub.add_parser("stats", help="Statystyki skuteczności")
     bt = sub.add_parser("backtest", help="Backtest silnika poziomów na historii notowań")
     bt.add_argument("tickers", nargs="+")
@@ -58,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Sesji: {summary.sessions}, dni bez sesji: {summary.no_session}, wierszy: {summary.rows}")
     elif args.cmd == "track":
         App.build(s).track()
+    elif args.cmd == "usage":
+        from .db import Database
+        print(json.dumps(Database(s.db_path).daily_report(), indent=2, ensure_ascii=False))
     elif args.cmd == "stats":
         from .tracker.stats import summarize
         print(json.dumps(summarize(App.build(s).db.all_signals()), indent=2, ensure_ascii=False))
