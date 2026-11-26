@@ -173,3 +173,42 @@ def test_pipeline_disabled_does_not_fetch(tmp_path):
     app.run_once()
     assert not app.calendar.events
     assert "szum – terminy raportów" in app.db.news_row(news.uid)["decision"]  # odrzuca pre-filtr (#6)
+
+
+# ------------------------------------------------------------------ pliki danych w repo
+
+def test_holidays_come_from_data_file(schedule):
+    from gpw_signals.config import load_holidays
+    assert schedule.holidays_file == "data/gpw_holidays.yaml"
+    assert sorted(load_holidays(schedule.holidays_file)) == schedule.holidays
+
+
+def test_holidays_file_rejects_wrong_year(tmp_path):
+    from gpw_signals.config import load_holidays
+    p = tmp_path / "h.yaml"
+    p.write_text('2026:\n  - "2027-01-01"\n', encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_holidays(p)
+
+
+def test_poll_tick_skips_cycle_on_holiday(schedule):
+    from gpw_signals.scheduler import poll_tick
+
+    class _App:
+        settings = Settings(schedule=schedule)
+        settings.monitoring.heartbeat_file = "/nonexistent-dir/x/heartbeat"
+
+        def run_once(self):
+            raise AssertionError("cykl w dzień bez sesji")
+
+        def clock(self):
+            return datetime.now(UTC)
+    poll_tick(_App(), datetime(2026, 12, 24, 10, 0, tzinfo=ZoneInfo("Europe/Warsaw")))
+
+
+@pytest.mark.parametrize("today, expected", [
+    (date(2026, 12, 7), True), (date(2026, 12, 10), True), (date(2026, 12, 6), False), (date(2026, 12, 11), False)])
+def test_earnings_within_3_days_on_repo_calendar(today, expected):
+    cal = EventCalendar(load_settings("config/settings.yaml").sources.macro_calendar_file)
+    assert cal.earnings_within("LPP", today=today) is expected
+    assert not cal.earnings_within("PKN", today=today)

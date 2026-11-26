@@ -1,6 +1,7 @@
 """Konfiguracja: progi i parametry z settings.yaml, sekrety z .env / zmiennych środowiskowych."""
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -31,6 +32,8 @@ class SourcesConfig(BaseModel):
     broker_keywords: list[str] = Field(default_factory=list)
     macro_calendar_file: str = "data/macro_calendar.yaml"
     fetch_report_schedules: bool = False   # pobieranie treści komunikatów z terminami raportów okresowych
+    fetch_espi_body: bool = False          # pobieranie treści komunikatu ESPI, gdy RSS ma tylko tytuł (#7)
+    max_body_fetches: int = 10             # limit pobrań stron komunikatów na cykl
     report_calendar_file: str = "data/report_calendar.yaml"
 
 
@@ -41,6 +44,7 @@ class ScheduleConfig(BaseModel):
     prices_at: str = "18:15"     # import dziennego pliku z archiwum GPW (po publikacji)
     tracker_at: str = "18:30"   # po imporcie notowań
     holidays: list[str] = Field(default_factory=list)
+    holidays_file: str | None = None   # YAML: rok -> lista dat; dokładane do `holidays` w load_settings
 
 
 class MarketConfig(BaseModel):
@@ -57,6 +61,12 @@ class MarketConfig(BaseModel):
     max_jump_pct: float = 40.0
     history_days: int = 250
     index_symbol: str = "wig20"
+    # Bieżący kurs w sesji (#4): none = tylko świece dzienne; csv = {intraday_dir}/{symbol}.csv
+    intraday_provider: str = "none"
+    intraday_dir: str = "data/intraday"
+    intraday_max_age_min: float = 20.0   # starszy kurs = fallback do świec dziennych
+    session_open: str = "09:00"
+    session_close: str = "17:05"
 
 
 class AgentConfig(BaseModel):
@@ -167,4 +177,20 @@ class Settings(BaseModel):
 def load_settings(path: str | Path = "config/settings.yaml") -> Settings:
     p = Path(path)
     data = yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {}
-    return Settings(**(data or {}), secrets=Secrets())
+    s = Settings(**(data or {}), secrets=Secrets())
+    if s.schedule.holidays_file:
+        s.schedule.holidays = sorted(set(s.schedule.holidays) | set(load_holidays(s.schedule.holidays_file)))
+    return s
+
+
+def load_holidays(path: str | Path) -> list[str]:
+    """Dni bez sesji z pliku YAML ({rok: [YYYY-MM-DD, ...]}). Brak pliku to błąd: bot handlowałby w święta."""
+    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    out = []
+    for year, days in data.items():
+        for d in days or []:
+            iso = date.fromisoformat(str(d)).isoformat()
+            if not iso.startswith(f"{year}-"):
+                raise ValueError(f"{path}: {iso} wpisany pod rokiem {year}")
+            out.append(iso)
+    return out

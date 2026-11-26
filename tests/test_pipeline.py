@@ -168,9 +168,19 @@ def test_news_left_unprocessed_by_crash_is_picked_up(make_app):
     assert _row(app, n)["processed"] == 1
 
 
-def test_stale_pending_news_is_skipped(make_app):
+def test_stale_news_dropped_at_ingest(make_app):
     n = _news(age=timedelta(hours=13))
     app = make_app([n])
+    assert app.run_once() == []
+    assert _row(app, n) is None and app.assessor.calls == 0
+    assert app.cycle_stats["news:za stary"] == 1
+
+
+def test_stale_pending_news_is_skipped(make_app):
+    # News trafił do kolejki świeży, ale zestarzał się w niej (np. po awarii)
+    n = _news(age=timedelta(hours=13))
+    app = make_app([])
+    app.db.insert_news_if_new(n)
     assert app.run_once() == []
     assert _row(app, n)["decision"] == "nieaktualny" and app.assessor.calls == 0
 
@@ -352,3 +362,21 @@ def test_stale_prices_skip_without_llm(make_app):
     n = _news()
     app = make_app([n], prices=StalePrices())
     assert "dane – ostatnie notowanie sprzed" in _decision(app, n) and app.assessor.calls == 0
+
+
+# ------------------------------------------------------------------ #4 kurs intraday
+
+def test_live_price_only_in_session_and_fresh(make_app):
+    from zoneinfo import ZoneInfo
+
+    from gpw_signals.market.intraday import Quote
+    pl = ZoneInfo("Europe/Warsaw")
+    q = Quote(42.0, datetime(2026, 11, 25, 11, 55, tzinfo=pl))
+    app = make_app([])
+    app.intraday = type("I", (), {"last_quote": lambda self, s: q})()
+    app.clock = lambda: datetime(2026, 11, 25, 12, 0, tzinfo=pl)
+    assert app._live_price("x") == 42.0
+    app.clock = lambda: datetime(2026, 11, 25, 8, 0, tzinfo=pl)  # przed sesją: wczorajsze zamknięcie
+    assert app._live_price("x") is None
+    app.clock = lambda: datetime(2026, 11, 25, 13, 0, tzinfo=pl)  # kurs nieświeży: fallback
+    assert app._live_price("x") is None

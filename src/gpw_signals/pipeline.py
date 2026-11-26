@@ -19,12 +19,13 @@ from .db import Database
 from .ingest.base import Source, fetch_all
 from .ingest.macro import EventCalendar
 from .ingest.report_schedule import ReportCalendar, ScheduleError, extract_body, fetch_page, is_report_schedule
-from .ingest.rss_portals import RssSource
+from .ingest.rss_portals import RssSource, needs_body
 from .levels.engine import compute_levels
 from .levels.validate import validate_levels
 from .mapping import TickerMap
 from .market import gpw_archive
 from .market.indicators import snapshot
+from .market.intraday import IntradayProvider, NoIntraday, SessionPhase, fresh_quote, make_intraday, session_phase
 from .market.prices import PriceProvider, make_provider
 from .market.quality import data_issues
 from .market.regime import Regime, market_regime
@@ -66,6 +67,8 @@ class App:
     # Pobieranie strony komunikatu (terminy raportów) – podmieniane w testach
     fetch_page: Callable[[str], str] = field(default=fetch_page)
     monitor: Monitor = field(default_factory=Monitor)
+    # Bieżący kurs w sesji (#4); brak = świece dzienne
+    intraday: IntradayProvider = field(default_factory=NoIntraday)
     # Statystyki ostatniego cyklu: wywołania LLM i decyzje podjęte bez LLM, wg etapu (#5)
     cycle_stats: Counter = field(default_factory=Counter)
 
@@ -99,6 +102,7 @@ class App:
             publisher = TelegramPublisher(sec.telegram_bot_token, chat)
         app = cls(settings, db, tickers, prices, calendar, sources, publisher, dry_run=dry_run)
         app.monitor = Monitor(threshold=settings.monitoring.fail_threshold)
+        app.intraday = make_intraday(m.intraday_provider, m.intraday_dir)
         if not dry_run and sec.telegram_bot_token and sec.telegram_admin_chat_id:
             app.monitor.notify = TelegramPublisher(sec.telegram_bot_token, sec.telegram_admin_chat_id).send
         app.assessor = make_assessor(settings.agent, ToolContext(prices, tickers, db, calendar))
@@ -113,8 +117,18 @@ class App:
         self.publish_pending()
 
         news = fetch_all(self.sources, self._source_result)
-        new = 0
+        pc = self.settings.processing
+        max_age = timedelta(hours=pc.max_news_age_hours)
+        now = self.clock()
+        new, body_fetches = 0, 0
         for n in news:
+            if now - n.published_at > max_age:
+                # Odrzucamy już przy pobraniu: stary news nie trafia do bazy ani kolejki (#7)
+                self.cycle_stats["news:za stary"] += 1
+                continue
+            if self._wants_body(n) and body_fetches < self.settings.sources.max_body_fetches:
+                body_fetches += 1
+                self._fill_body(n)
             n.tickers = self.tickers.map_news(n.title, n.summary, n.kind)
             new += self.db.insert_news_if_new(n)
         if new:
@@ -123,9 +137,6 @@ class App:
         log.info("Nowych newsów: %d (z %d), w kolejce: %d", new, len(news), len(queue))
 
         regime = self._regime()
-        pc = self.settings.processing
-        max_age = timedelta(hours=pc.max_news_age_hours)
-        now = self.clock()
         published: list[Signal] = []
         for n in queue:
             if now - n.published_at > max_age:
@@ -188,6 +199,21 @@ class App:
         self.monitor.ok("agent")
         return a
 
+    def _wants_body(self, n: NewsItem) -> bool:
+        return (self.settings.sources.fetch_espi_body and n.kind == SourceKind.ESPI and bool(n.url)
+                and needs_body(n) and not self.db.has_news(n.uid))
+
+    def _fill_body(self, n: NewsItem) -> None:
+        """Treść komunikatu ze strony, gdy RSS ma tylko tytuł. Błąd = zostaje to, co dał RSS."""
+        try:
+            body = extract_body(self.fetch_page(n.url))
+        except Exception as e:  # noqa: BLE001 – sieć: news idzie dalej z samym tytułem
+            log.warning("Treść komunikatu %s: %s", n.url, e)
+            return
+        if body:
+            n.summary = body[:2000]
+            self.cycle_stats["news:pobrana treść"] += 1
+
     def _is_schedule(self, n: NewsItem) -> bool:
         # Dry-run ma nie zostawiać śladów, a ten import zapisuje plik
         return (self.settings.sources.fetch_report_schedules and not self.dry_run
@@ -228,11 +254,14 @@ class App:
         issues = data_issues(df, market_date(self.clock(), self.tz), m.max_data_age_days, m.max_jump_pct)
         if issues:
             return self._skip("dane", f"{ticker}: dane – {'; '.join(issues)}")
+        live = self._live_price(company.symbol)
         try:
             snap = snapshot(df, self.settings.levels.atr_period,
-                            self.settings.levels.swing_window, self.settings.levels.swing_lookback)
+                            self.settings.levels.swing_window, self.settings.levels.swing_lookback,
+                            live_price=live, session_date=market_date(self.clock(), self.tz))
         except ValueError as e:
             return self._skip("historia", f"{ticker}: {e}")
+        phase = session_phase(n.published_at, self.tz, m.session_open, m.session_close)
 
         # #5: wszystko, co nie zależy od oceny agenta, sprawdzamy PRZED kosztownym wywołaniem LLM
         lr = compute_levels(snap, self.settings.levels, company.liquidity_band)
@@ -273,8 +302,24 @@ class App:
         self.db.insert_signal(sig)
         self.cycle_stats["sygnał"] += 1
         if self._publish(sig):
-            return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f}"
-        return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} – publikacja do ponowienia"
+            return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}, kurs {snap.price_source})"
+        return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}) – publikacja do ponowienia"
+
+    def _live_price(self, symbol: str) -> float | None:
+        """Bieżący kurs tylko w trakcie sesji i tylko świeży; inaczej None = świece dzienne (#4).
+        News przed sesją (ESPI 7:00–9:00) jest więc oceniany od wczorajszego zamknięcia."""
+        m = self.settings.market
+        now = self.clock()
+        if session_phase(now, self.tz, m.session_open, m.session_close) != SessionPhase.IN:
+            return None
+        try:
+            q = fresh_quote(self.intraday, symbol, now, self.tz, m.intraday_max_age_min, m.session_open)
+        except Exception as e:  # noqa: BLE001 – awaria intraday nie blokuje oceny
+            self.monitor.fail("kurs intraday", f"{symbol}: {e}")
+            return None
+        if q is None:
+            log.debug("%s: brak świeżego kursu intraday – świece dzienne", symbol)
+        return q.price if q else None
 
     def _skip(self, stage: str, decision: str) -> tuple[None, str]:
         """Decyzja podjęta bez wywołania LLM – liczona, żeby było widać oszczędność."""
