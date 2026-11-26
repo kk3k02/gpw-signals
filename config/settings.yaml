@@ -10,28 +10,8 @@ schedule:
   active_to: "17:10"
   prices_at: "18:15"             # import notowań z archiwum GPW (po publikacji pliku dziennego)
   tracker_at: "18:30"            # sprawdzanie wyników sygnałów po imporcie notowań
-  # Dni bez sesji: https://www.gpw.pl/szczegoly-sesji (odczyt 2026-11-25); dopisz kolejny rok po publikacji
-  holidays:
-    - "2026-01-01"
-    - "2026-01-06"
-    - "2026-04-03"
-    - "2026-04-06"
-    - "2026-05-01"
-    - "2026-06-04"
-    - "2026-11-11"
-    - "2026-12-24"
-    - "2026-12-25"
-    - "2026-12-31"
-    - "2027-01-01"
-    - "2027-01-06"
-    - "2027-03-26"
-    - "2027-03-29"
-    - "2027-05-03"
-    - "2027-05-27"
-    - "2027-11-01"
-    - "2027-11-11"
-    - "2027-12-24"
-    - "2027-12-31"
+  # Dni bez sesji GPW ładowane z pliku (wpisy z "holidays:" poniżej są do nich dokładane)
+  holidays_file: data/gpw_holidays.yaml
 
 sources:
   # Każdy feed: name, kind (espi|portal|broker|macro), url, priority (wyżej = ważniejszy).

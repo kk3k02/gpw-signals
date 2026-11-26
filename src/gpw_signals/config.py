@@ -1,6 +1,7 @@
 """Konfiguracja: progi i parametry z settings.yaml, sekrety z .env / zmiennych środowiskowych."""
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import Literal
 
@@ -41,6 +42,7 @@ class ScheduleConfig(BaseModel):
     prices_at: str = "18:15"     # import dziennego pliku z archiwum GPW (po publikacji)
     tracker_at: str = "18:30"   # po imporcie notowań
     holidays: list[str] = Field(default_factory=list)
+    holidays_file: str | None = None   # YAML: rok -> lista dat; dokładane do `holidays` w load_settings
 
 
 class MarketConfig(BaseModel):
@@ -167,4 +169,20 @@ class Settings(BaseModel):
 def load_settings(path: str | Path = "config/settings.yaml") -> Settings:
     p = Path(path)
     data = yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {}
-    return Settings(**(data or {}), secrets=Secrets())
+    s = Settings(**(data or {}), secrets=Secrets())
+    if s.schedule.holidays_file:
+        s.schedule.holidays = sorted(set(s.schedule.holidays) | set(load_holidays(s.schedule.holidays_file)))
+    return s
+
+
+def load_holidays(path: str | Path) -> list[str]:
+    """Dni bez sesji z pliku YAML ({rok: [YYYY-MM-DD, ...]}). Brak pliku to błąd: bot handlowałby w święta."""
+    data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    out = []
+    for year, days in data.items():
+        for d in days or []:
+            iso = date.fromisoformat(str(d)).isoformat()
+            if not iso.startswith(f"{year}-"):
+                raise ValueError(f"{path}: {iso} wpisany pod rokiem {year}")
+            out.append(iso)
+    return out
