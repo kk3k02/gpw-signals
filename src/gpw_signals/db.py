@@ -97,6 +97,9 @@ class Database:
         self.conn.commit()
         return cur.rowcount == 1
 
+    def has_news(self, uid: str) -> bool:
+        return self.conn.execute("SELECT 1 FROM news WHERE uid=?", (uid,)).fetchone() is not None
+
     def mark_news(self, uid: str, decision: str) -> None:
         """Decyzja ostateczna – news nie wróci do kolejki."""
         self.conn.execute("UPDATE news SET processed=1, decision=? WHERE uid=?", (decision, uid))

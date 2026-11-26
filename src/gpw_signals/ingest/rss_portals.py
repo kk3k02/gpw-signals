@@ -18,9 +18,19 @@ def _clean(text: str) -> str:
     return html.unescape(_TAG.sub(" ", text or "")).strip()
 
 
+_TOC = re.compile(r"^\s*Spis treści", re.IGNORECASE)
+
+
 def _published(entry) -> datetime:
+    """Data publikacji zawsze w UTC: feedparser zamienia strefę z pubDate (np. +0100) na UTC w *_parsed."""
     t = entry.get("published_parsed") or entry.get("updated_parsed")
     return datetime(*t[:6], tzinfo=UTC) if t else datetime.now(UTC)
+
+
+def needs_body(item: NewsItem) -> bool:
+    """RSS niesie tylko tytuł: brak opisu, opis = tytuł albo sam spis treści raportu (bankier.pl)."""
+    s = item.summary.strip()
+    return not s or s == item.title.strip() or bool(_TOC.match(s))
 
 
 def parse_feed(raw: str | bytes, cfg: FeedConfig, keywords: list[str] | None = None) -> list[NewsItem]:
