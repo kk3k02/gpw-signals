@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable
 
 import anthropic
 
 from ..config import AgentConfig
 from ..models import Assessment, NewsItem
+from .base import AgentError, UsageCallback
 from .prompts import SYSTEM_PROMPT, USER_TEMPLATE
 from .tools import TOOL_DEFINITIONS, ToolContext
 from .usage import TokenUsage
@@ -38,16 +38,12 @@ ASSESSMENT_SCHEMA = {
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
 
-class AgentError(RuntimeError):
-    pass
-
-
 class NewsAssessor:
     def __init__(self, cfg: AgentConfig, ctx: ToolContext, client: anthropic.Anthropic | None = None):
         self.cfg, self.ctx = cfg, ctx
         self._client = client
         # Wołane po każdej odpowiedzi API (także odmowie – też jest płatna): (model, zużycie)
-        self.on_usage: Callable[[str, TokenUsage], None] | None = None
+        self.on_usage: UsageCallback | None = None
 
     @property
     def client(self) -> anthropic.Anthropic:
@@ -105,12 +101,12 @@ class NewsAssessor:
             text = next((b.text for b in resp.content if b.type == "text"), None)
             if not text:
                 raise AgentError(f"Brak odpowiedzi tekstowej (stop={resp.stop_reason})")
-            return _to_assessment(json.loads(text), ticker)
+            return to_assessment(json.loads(text), ticker)
 
         raise AgentError("Agent przekroczył limit rund narzędzi")
 
 
-def _to_assessment(d: dict, ticker: str) -> Assessment:
+def to_assessment(d: dict, ticker: str) -> Assessment:
     return Assessment(
         ticker=ticker,
         actionable=bool(d["actionable"]),
