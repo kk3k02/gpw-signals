@@ -36,8 +36,13 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("health", help="Kod wyjścia 1, gdy bot nie kończy cykli (healthcheck)")
     sub.add_parser("stats", help="Statystyki skuteczności")
     bt = sub.add_parser("backtest", help="Backtest silnika poziomów na historii notowań")
-    bt.add_argument("tickers", nargs="+")
+    bt.add_argument("tickers", nargs="*", help="Backtest samych poziomów dla tych spółek")
     bt.add_argument("--horizon", type=int, default=10)
+    bt.add_argument("--from", dest="start", type=date.fromisoformat,
+                    help="Backtest całego pipeline'u na historycznych newsach od YYYY-MM-DD (wywołuje model!)")
+    bt.add_argument("--to", dest="end", type=date.fromisoformat)
+    bt.add_argument("--news", default="data/backtest/news.yaml", help="Zbiór historycznych newsów (YAML)")
+    bt.add_argument("--details", action="store_true", help="Wypisz decyzję dla każdego newsa")
     pv = sub.add_parser("preview", help="Policz i pokaż poziomy dla spółki (bez LLM i bez wysyłki)")
     pv.add_argument("ticker")
     args = p.parse_args(argv)
@@ -74,6 +79,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "stats":
         from .tracker.stats import summarize
         print(json.dumps(summarize(App.build(s).db.all_signals()), indent=2, ensure_ascii=False))
+    elif args.cmd == "backtest" and (args.start or not args.tickers):
+        _backtest_news(s, args)
     elif args.cmd in ("backtest", "preview"):
         app = App.build(s, dry_run=True)
         if args.cmd == "backtest":
@@ -166,6 +173,26 @@ def _preview(app, ticker: str) -> None:
     a = Assessment(ticker, True, "long", "inne", 0.0, 10, False, "(podgląd – bez oceny agenta)")
     print(format_signal(Signal(ticker, c.name, lr.levels, 0.0, a, "", utc_now())))
     print("Walidacja:", validate_levels(lr.levels, app.settings.filters.min_rr_t1) or "OK")
+
+
+def _backtest_news(s, args) -> None:
+    from zoneinfo import ZoneInfo
+
+    from .agent.factory import make_assessor
+    from .ingest.macro import EventCalendar
+    from .mapping import TickerMap
+    from .market.prices import make_provider
+    from .news_backtest import backtest_news, load_news
+
+    m = s.market
+    rep = backtest_news(s, TickerMap.from_csv(s.tickers_csv), make_provider(m.provider, m.stooq_url, m.csv_dir),
+                        None, load_news(args.news), args.start, args.end,
+                        calendar=EventCalendar(s.sources.macro_calendar_file, ZoneInfo(s.timezone),
+                                               extra=[s.sources.report_calendar_file]),
+                        make_assessor=lambda ctx: make_assessor(s.agent, ctx))
+    if args.details:
+        print(*rep.details, sep="\n")
+    print(json.dumps(rep.summary(), indent=2, ensure_ascii=False))
 
 
 def _eval_agent(s, args) -> None:
