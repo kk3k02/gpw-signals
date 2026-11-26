@@ -9,7 +9,9 @@ def _p(x: float) -> str:
     return f"{x:.2f}" if x >= 1 else f"{x:.3f}"
 
 
-def format_signal(s: Signal, include_thesis: bool = True, disclaimer: str = "") -> str:
+def format_signal(s: Signal, include_thesis: bool = True, disclaimer: str = "",
+                  methodology_url: str = "", conflict_note: str = "") -> str:
+    """`conflict_note` – ujawnienie konfliktu interesów (pusty = brak konfliktu dla tej spółki)."""
     lv = s.levels
     lines = [
         f"Nazwa spółki: {_label(s)}",
@@ -20,9 +22,18 @@ def format_signal(s: Signal, include_thesis: bool = True, disclaimer: str = "") 
     lines.append(f"StopLoss: {_p(lv.stop_loss)}")
     if include_thesis and s.assessment.thesis:
         lines += ["", f"Katalizator: {s.assessment.thesis}"]
+    if conflict_note:
+        lines += ["", conflict_note.strip()]
     if disclaimer:
         lines += ["", disclaimer.strip()]
+    if methodology_url:
+        lines.append(f"Metodologia: {methodology_url.strip()}")
     return "\n".join(lines)
+
+
+def conflict_note_for(ticker: str, conflict_tickers: list[str], note: str) -> str:
+    """Dopisek o konflikcie interesów, gdy spółka jest na liście pozycji autora."""
+    return note if ticker.upper() in {t.strip().upper() for t in conflict_tickers} else ""
 
 
 _OUTCOME_TEXT = {

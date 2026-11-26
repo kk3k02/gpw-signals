@@ -132,6 +132,15 @@ class PublishConfig(BaseModel):
     include_thesis: bool = True
     post_outcomes: bool = True
     disclaimer: str = ""
+    methodology_url: str = ""          # link do opisu metodologii (docs/METODOLOGIA.md) w każdym sygnale
+    # Konflikty interesów (#16): spółki, w których autor ma pozycję – sygnał dostaje dopisek
+    conflict_tickers: list[str] = Field(default_factory=list)
+    conflict_note: str = "Ujawnienie: autor kanału posiada pozycję w akcjach tej spółki."
+
+
+class ArchiveConfig(BaseModel):
+    # None = archiwum opublikowanych sygnałów nie jest nigdy usuwane (domyślnie)
+    retention_days: int | None = None
 
 
 class TrackerConfig(BaseModel):
@@ -172,6 +181,7 @@ class Settings(BaseModel):
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     publish: PublishConfig = Field(default_factory=PublishConfig)
+    archive: ArchiveConfig = Field(default_factory=ArchiveConfig)
     secrets: Secrets = Field(default_factory=Secrets)
 
 

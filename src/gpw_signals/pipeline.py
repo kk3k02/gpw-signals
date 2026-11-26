@@ -32,7 +32,7 @@ from .market.regime import Regime, market_regime
 from .models import Assessment, NewsItem, Signal, SignalStatus, SourceKind
 from .monitor import Monitor, format_daily_report
 from .prefilter import noise_reason
-from .publish.formatter import format_outcome, format_signal, format_weekly_summary
+from .publish.formatter import conflict_note_for, format_outcome, format_signal, format_weekly_summary
 from .publish.telegram import DryRunPublisher, Publisher, TelegramPublisher
 from .scoring import pre_agent_check, score_signal
 from .tracker.outcomes import evaluate
@@ -338,7 +338,9 @@ class App:
     def _publish(self, sig: Signal) -> bool:
         p = self.settings.publish
         try:
-            msg_id = self.publisher.send(format_signal(sig, p.include_thesis, p.disclaimer))
+            conflict = conflict_note_for(sig.ticker, p.conflict_tickers, p.conflict_note)
+            msg_id = self.publisher.send(format_signal(sig, p.include_thesis, p.disclaimer,
+                                                       p.methodology_url, conflict))
         except Exception as e:  # noqa: BLE001 – każda awaria wysyłki = ponowienie z bazy
             log.warning("Publikacja sygnału %s (%s) nieudana: %s", sig.id, sig.ticker, e)
             self.monitor.fail("publikacja", e, threshold=1)

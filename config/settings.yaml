@@ -127,3 +127,11 @@ publish:
   disclaimer: >-
     Materiał ma charakter informacyjny i nie stanowi rekomendacji inwestycyjnej ani porady.
     Sygnał wygenerowany automatycznie. Inwestowanie wiąże się z ryzykiem utraty kapitału.
+  # Link do opisu metodologii (#16) – np. adres opublikowanego docs/METODOLOGIA.md; pusty = bez linku
+  methodology_url: ""
+  # Ujawnianie konfliktów interesów: tickery spółek, w których autor ma pozycję
+  conflict_tickers: []
+  conflict_note: "Ujawnienie: autor kanału posiada pozycję w akcjach tej spółki."
+
+archive:
+  retention_days:                # puste = archiwum sygnałów nigdy nie jest usuwane (domyślnie)
