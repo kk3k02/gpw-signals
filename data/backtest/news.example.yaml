@@ -1,0 +1,14 @@
+# Zbiór historycznych newsów do `python -m gpw_signals backtest --from 2026-01-01 --news <plik>`.
+# published_at bez strefy = czas warszawski (jak w ESPI). kind: espi | broker | portal | macro.
+# To tylko przykład formatu – właściwy zbiór (ESPI z ostatnich miesięcy) zapisz w data/backtest/news.yaml.
+- published_at: 2026-01-15T08:31:00
+  kind: espi
+  source: espi
+  title: "ORLEN S.A. - Zawarcie istotnej umowy"
+  summary: "Spółka zawarła umowę o wartości przekraczającej 10% kapitałów własnych."
+  url: https://example.invalid/espi/1
+- published_at: 2026-02-03T18:12:00
+  kind: broker
+  source: rekomendacje
+  title: "Rekomendacja kupuj dla PKO BP, cena docelowa podniesiona"
+  url: https://example.invalid/rek/2
