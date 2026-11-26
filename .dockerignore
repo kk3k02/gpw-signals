@@ -1,0 +1,12 @@
+.env
+.venv
+.git
+.github
+.claude
+.pytest_cache
+.ruff_cache
+**/__pycache__
+tests
+data/gpw_signals.sqlite*
+data/prices
+data/raw

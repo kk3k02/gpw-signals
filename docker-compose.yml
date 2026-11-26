@@ -1,8 +1,17 @@
 services:
   gpw-signals:
     build: .
+    image: gpw-signals:latest
+    container_name: gpw-signals
     restart: unless-stopped
     env_file: .env
+    environment:
+      TZ: Europe/Warsaw
     volumes:
       - ./config:/app/config:ro
-      - ./data:/app/data        # baza SQLite + tickery + kalendarz
+      - ./data:/app/data        # baza SQLite, tickery, kalendarz, notowania
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
