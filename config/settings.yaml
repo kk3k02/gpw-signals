@@ -10,13 +10,9 @@ schedule:
   active_to: "17:10"
   prices_at: "18:15"             # import notowań z archiwum GPW (po publikacji pliku dziennego)
   tracker_at: "18:30"            # sprawdzanie wyników sygnałów po imporcie notowań
-  # Dni bez sesji na GPW – UZUPEŁNIJ z oficjalnego kalendarza GPW na dany rok
-  holidays:
-    - "2026-12-24"
-    - "2026-12-25"
-    - "2026-12-31"
-    - "2027-01-01"
-    - "2027-01-06"
+  # Święta GPW (stałe, Wielkanoc, Boże Ciało, Wigilia, Sylwester) są wyliczane automatycznie
+  # (market/calendar.py). Tu dopisz tylko nietypowe zamknięcia ogłoszone przez GPW (YYYY-MM-DD).
+  holidays: []
 
 sources:
   # Każdy feed: name, kind (espi|portal|broker|macro), url, priority (wyżej = ważniejszy).

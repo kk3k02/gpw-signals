@@ -2,18 +2,15 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, time
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
+from .market.calendar import is_session_day
 from .pipeline import App
 
 log = logging.getLogger(__name__)
-
-
-def is_session_day(d: date, holidays: list[str]) -> bool:
-    return d.weekday() < 5 and d.isoformat() not in holidays
 
 
 def in_active_window(now: datetime, start: str, end: str) -> bool:
