@@ -9,7 +9,7 @@ import anthropic
 from ..config import AgentConfig
 from ..models import Assessment, NewsItem
 from .base import AgentError, UsageCallback
-from .prompts import SYSTEM_PROMPT, USER_TEMPLATE
+from .prompts import SYSTEM_PROMPT, USER_TEMPLATE, published_label
 from .tools import TOOL_DEFINITIONS, ToolContext
 from .usage import TokenUsage
 
@@ -70,7 +70,7 @@ class NewsAssessor:
 
     def assess(self, news: NewsItem, ticker: str, company: str) -> Assessment:
         messages: list[dict] = [{"role": "user", "content": USER_TEMPLATE.format(
-            source=news.source, kind=news.kind.value, published_at=news.published_at.isoformat(),
+            source=news.source, kind=news.kind.value, published_at=published_label(news.published_at),
             title=news.title, summary=news.summary or "(brak)", url=news.url, company=company, ticker=ticker)}]
 
         for _ in range(self.cfg.max_tool_rounds):

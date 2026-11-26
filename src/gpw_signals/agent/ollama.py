@@ -9,7 +9,7 @@ from ..config import AgentConfig
 from ..models import Assessment, NewsItem
 from .assess import ASSESSMENT_SCHEMA, to_assessment
 from .base import AgentError, AgentUnavailable, UsageCallback
-from .prompts import CONTEXT_TEMPLATE, LOCAL_SYSTEM_PROMPT, USER_TEMPLATE
+from .prompts import CONTEXT_TEMPLATE, LOCAL_SYSTEM_PROMPT, USER_TEMPLATE, published_label
 from .tools import ToolContext
 from .usage import LOCAL_PREFIX, TokenUsage
 
@@ -92,7 +92,7 @@ class OllamaAssessor:
 
     def assess(self, news: NewsItem, ticker: str, company: str) -> Assessment:
         user = USER_TEMPLATE.format(
-            source=news.source, kind=news.kind.value, published_at=news.published_at.isoformat(), title=news.title,
+            source=news.source, kind=news.kind.value, published_at=published_label(news.published_at), title=news.title,
             summary=news.summary[:_NEWS_CHARS] or "(brak)", url=news.url, company=company, ticker=ticker)
         resp = self._chat(f"{self._context(news, ticker)}\n\n{user}")
         if self.on_usage:

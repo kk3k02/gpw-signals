@@ -59,3 +59,10 @@ Wskaźniki: {indicators}
 Ostatnie sesje: {history}
 Wcześniejsze newsy: {related}
 Nadchodzące zdarzenia: {events}"""
+
+
+def published_label(published_at) -> str:
+    """Data publikacji z porą względem sesji GPW (#4), np. "2026-11-25T07:30:00+01:00 (przed sesją)"."""
+    from ..clock import MARKET_TZ
+    from ..market.intraday import session_phase
+    return f"{published_at.isoformat()} ({session_phase(published_at, MARKET_TZ).value})"

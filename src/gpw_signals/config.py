@@ -57,6 +57,12 @@ class MarketConfig(BaseModel):
     max_jump_pct: float = 40.0
     history_days: int = 250
     index_symbol: str = "wig20"
+    # Bieżący kurs w sesji (#4): none = tylko świece dzienne; csv = {intraday_dir}/{symbol}.csv
+    intraday_provider: str = "none"
+    intraday_dir: str = "data/intraday"
+    intraday_max_age_min: float = 20.0   # starszy kurs = fallback do świec dziennych
+    session_open: str = "09:00"
+    session_close: str = "17:05"
 
 
 class AgentConfig(BaseModel):

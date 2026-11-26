@@ -352,3 +352,21 @@ def test_stale_prices_skip_without_llm(make_app):
     n = _news()
     app = make_app([n], prices=StalePrices())
     assert "dane – ostatnie notowanie sprzed" in _decision(app, n) and app.assessor.calls == 0
+
+
+# ------------------------------------------------------------------ #4 kurs intraday
+
+def test_live_price_only_in_session_and_fresh(make_app):
+    from zoneinfo import ZoneInfo
+
+    from gpw_signals.market.intraday import Quote
+    pl = ZoneInfo("Europe/Warsaw")
+    q = Quote(42.0, datetime(2026, 11, 25, 11, 55, tzinfo=pl))
+    app = make_app([])
+    app.intraday = type("I", (), {"last_quote": lambda self, s: q})()
+    app.clock = lambda: datetime(2026, 11, 25, 12, 0, tzinfo=pl)
+    assert app._live_price("x") == 42.0
+    app.clock = lambda: datetime(2026, 11, 25, 8, 0, tzinfo=pl)  # przed sesją: wczorajsze zamknięcie
+    assert app._live_price("x") is None
+    app.clock = lambda: datetime(2026, 11, 25, 13, 0, tzinfo=pl)  # kurs nieświeży: fallback
+    assert app._live_price("x") is None
