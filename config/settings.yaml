@@ -39,7 +39,9 @@ sources:
   rss:
     - {name: bankier-espi, kind: espi, priority: 3, url: "https://www.bankier.pl/rss/espi.xml"}
     - {name: bankier-wiadomosci, kind: portal, priority: 1, url: "https://www.bankier.pl/rss/wiadomosci.xml"}
-    - {name: bankier-rekomendacje, kind: broker, priority: 2, url: "https://www.bankier.pl/rss/rekomendacje.xml"}
+    # rss/rekomendacje.xml zwraca pusty dokument (sprawdzone 2026-11-26) i nie ma go na bankier.pl/rss.
+    # Zamiast niego feed giełdowy: rekomendacje DM wyłapują z niego broker_keywords poniżej.
+    - {name: bankier-gielda, kind: portal, priority: 2, url: "https://www.bankier.pl/rss/gielda.xml"}
   # Po tych rdzeniach news z portalu traktujemy jako rekomendację DM (wszystkie rdzenie frazy muszą wystąpić)
   broker_keywords: ["rekomendac", "cen docelow", "kupuj", "akumuluj"]
   # Kalendarz makro/wyników – ręcznie lub z pliku (YYYY-MM-DD: opis)
@@ -47,6 +49,10 @@ sources:
   # Terminy raportów okresowych z komunikatów ESPI: pobiera stronę komunikatu i zapisuje daty do pliku.
   # Wyłączone, dopóki nie sprawdzisz regulaminu serwisu, z którego pochodzi feed ESPI (#7).
   fetch_report_schedules: false
+  # Pełna treść komunikatu ESPI ze strony, gdy RSS ma tylko tytuł lub spis treści (#7). robots.txt
+  # bankier.pl nie blokuje /wiadomosc/, ale włącz dopiero po sprawdzeniu regulaminu serwisu.
+  fetch_espi_body: false
+  max_body_fetches: 10           # limit pobrań stron na cykl
   report_calendar_file: data/report_calendar.yaml
 
 market:
@@ -103,7 +109,7 @@ filters:
   min_score: 0.55
 
 processing:
-  max_news_age_hours: 12         # nieprzetworzone newsy starsze niż to -> "nieaktualny"
+  max_news_age_hours: 12         # starsze newsy odrzucane przy pobraniu; w kolejce -> "nieaktualny"
   max_attempts: 3                # ponowienia po błędach przejściowych (API, sieć, notowania)
 
 prefilter:                       # szum ESPI odrzucany przed agentem (reguły: prefilter.py)

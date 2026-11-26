@@ -168,9 +168,19 @@ def test_news_left_unprocessed_by_crash_is_picked_up(make_app):
     assert _row(app, n)["processed"] == 1
 
 
-def test_stale_pending_news_is_skipped(make_app):
+def test_stale_news_dropped_at_ingest(make_app):
     n = _news(age=timedelta(hours=13))
     app = make_app([n])
+    assert app.run_once() == []
+    assert _row(app, n) is None and app.assessor.calls == 0
+    assert app.cycle_stats["news:za stary"] == 1
+
+
+def test_stale_pending_news_is_skipped(make_app):
+    # News trafił do kolejki świeży, ale zestarzał się w niej (np. po awarii)
+    n = _news(age=timedelta(hours=13))
+    app = make_app([])
+    app.db.insert_news_if_new(n)
     assert app.run_once() == []
     assert _row(app, n)["decision"] == "nieaktualny" and app.assessor.calls == 0
 
