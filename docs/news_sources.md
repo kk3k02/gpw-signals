@@ -1,6 +1,6 @@
 # Źródła newsów – robots.txt i regulaminy (issue #7)
 
-Sprawdzone 2026-11-26. To odczyt tekstów serwisów, nie opinia prawna. Nowe źródła są w
+Sprawdzone 2026-11-26. Nowe źródła są w
 `config/settings.yaml` z `enabled: false` – włącz świadomie.
 
 | Serwis | robots.txt | Regulamin / warunki | Wniosek |

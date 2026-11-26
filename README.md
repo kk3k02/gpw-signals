@@ -50,15 +50,14 @@ python -m gpw_signals usage                # newsy wg etapu, tokeny i szacowany 
 - **Dane cenowe:** domyślnie darmowe notowania dzienne z [archiwum GPW](https://www.gpw.pl/archiwum-notowan), importowane do `data/prices/` (`fetch-prices`, a w trybie `run` codziennie o `schedule.prices_at`). Surowe pliki są w cache `data/raw/gpw/`, więc po dopisaniu spółek do `gpw_tickers.csv` ponowny import nie pobiera nic z sieci. Ograniczenia:
   - dane są **dzienne**, więc w trakcie sesji poziomy liczą się od ostatniego zamknięcia (#4),
   - ceny są **nieskorygowane** o splity i prawa poboru; spółka ze skokiem kursu > `max_jump_pct` jest pomijana,
-  - przed publicznym kanałem sprawdź warunki korzystania z danych GPW (#16). Inne źródło podepniesz, zapisując CSV do `data/prices` albo dopisując własny `PriceProvider`.
-- **Źródła:** zweryfikuj URL-e feedów i regulaminy serwisów w `config/settings.yaml`. Feed `bankier-rekomendacje` zwraca 0 pozycji.
+  - inne źródło podepniesz, zapisując CSV do `data/prices` albo dopisując własny `PriceProvider`.
+- **Źródła:** zweryfikuj URL-e feedów w `config/settings.yaml`. Feed `bankier-rekomendacje` zwraca 0 pozycji.
 - **Lista spółek:** `data/gpw_tickers.csv` obejmuje cały rynek główny (ok. 390 spółek, `build-tickers`). Ręcznie opisane są tylko największe spółki (pełna nazwa, aliasy, sektor). Dla pozostałych tickerem jest nazwa skrócona GPW (np. `POLIMEXMS`). Mapowanie newsów:
   - komunikat ESPI dotyczy tylko emitenta z tytułu ("EMITENT: temat"), nie kontrahentów z treści,
   - wiadomości z portali są mapowane tylko po tytule, bo lead często wymienia spółki poboczne,
   - skróty i nazwy skrócone dopasowujemy tylko WIELKIMI literami; jakość mierzy `tests/test_mapping.py` na oznaczonych tytułach z `tests/fixtures/mapping_cases.yaml`.
 - **Krok notowań:** tabela RTS 11 (MiFID II) w `market/tick_size.py`; pasmo płynności spółki to kolumna `liquidity_band` w `gpw_tickers.csv`. Pasma zmieniają się co roku 1 kwietnia: odśwież je przez `python -m gpw_signals update-ticks` (rejestr ESMA FITRS), także po `build-tickers`.
-- **Kalendarz:** dni bez sesji 2026–2027 są w `data/gpw_holidays.yaml` (ładowane przez `schedule.holidays_file`; brak kolejnego roku bot zgłosi w logu od grudnia). Terminy raportów spółek bot może czytać z komunikatów ESPI do `data/report_calendar.yaml` (`sources.fetch_report_schedules`, domyślnie wyłączone: najpierw sprawdź regulamin serwisu). RPP, GUS i terminy sprzed włączenia dopisz ręcznie w `data/macro_calendar.yaml`.
-- **Prawo:** publiczne sygnały kup/cel/SL to w UE rekomendacje inwestycyjne (MAR art. 20, rozporządzenie 2016/958, nadzór KNF). Przed uruchomieniem publicznego kanału skonsultuj się z prawnikiem.
+- **Kalendarz:** dni bez sesji 2026–2027 są w `data/gpw_holidays.yaml` (ładowane przez `schedule.holidays_file`; brak kolejnego roku bot zgłosi w logu od grudnia). Terminy raportów spółek bot może czytać z komunikatów ESPI do `data/report_calendar.yaml` (`sources.fetch_report_schedules`, domyślnie wyłączone). RPP, GUS i terminy sprzed włączenia dopisz ręcznie w `data/macro_calendar.yaml`.
 - Na start `publish.use_test_channel: true`. Kanał docelowy włączaj dopiero po okresie testów i analizie `stats`.
 
 ## Uruchomienie w Dockerze
