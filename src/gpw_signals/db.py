@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
+from .agent.usage import TokenUsage
 from .clock import from_iso, to_iso
 from .models import Assessment, Levels, NewsItem, Signal, SignalStatus, SourceKind
 
@@ -22,14 +23,24 @@ CREATE TABLE IF NOT EXISTS signals (
     ticker TEXT, company_name TEXT, created_at TEXT, news_uid TEXT,
     entry_min REAL, entry_max REAL, t1 REAL, t2 REAL, t3 REAL, stop_loss REAL,
     score REAL, assessment TEXT, status TEXT, horizon_days INTEGER,
-    telegram_message_id INTEGER, closed_at TEXT
+    telegram_message_id INTEGER, closed_at TEXT,
+    close_reason TEXT, result_r REAL, result_pct REAL, last_outcome_on TEXT
+);
+CREATE TABLE IF NOT EXISTS llm_usage (
+    day TEXT, model TEXT, requests INTEGER, input INTEGER, output INTEGER, cache_read INTEGER, cache_write INTEGER,
+    PRIMARY KEY (day, model)
+);
+CREATE TABLE IF NOT EXISTS stage_counts (
+    day TEXT, stage TEXT, n INTEGER, PRIMARY KEY (day, stage)
 );
 CREATE INDEX IF NOT EXISTS ix_signals_ticker ON signals(ticker, created_at);
 CREATE INDEX IF NOT EXISTS ix_news_pending ON news(processed, published_at);
 """
 
 # Kolumny dodane po pierwszej wersji schematu – dopisywane do istniejących baz
-_MIGRATIONS = {"news": {"attempts": "INTEGER DEFAULT 0", "last_error": "TEXT"}}
+_MIGRATIONS = {"news": {"attempts": "INTEGER DEFAULT 0", "last_error": "TEXT"},
+               "signals": {"close_reason": "TEXT", "result_r": "REAL", "result_pct": "REAL",
+                           "last_outcome_on": "TEXT"}}
 
 # Wersja formatu danych (PRAGMA user_version). 1 = wszystkie daty w UTC w formacie clock.to_iso.
 _DATA_VERSION = 1
@@ -40,7 +51,9 @@ class Database:
     def __init__(self, path: str | Path):
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path))
+        # Zadania schedulera działają w jego wątku, a połączenie powstaje w głównym. Dostęp jest
+        # szeregowy: scheduler ma jeden wątek roboczy (scheduler.make_scheduler).
+        self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self._migrate()
         self.conn.executescript(SCHEMA)
@@ -118,6 +131,38 @@ class Database:
             "ORDER BY published_at DESC LIMIT ?", (f'%"{ticker}"%', limit)).fetchall()
         return [dict(r) for r in rows]
 
+    # --- liczniki dzienne (#6) ---
+    def add_usage(self, day: date, model: str, u: TokenUsage) -> None:
+        self.conn.execute(
+            "INSERT INTO llm_usage VALUES (?,?,1,?,?,?,?) ON CONFLICT(day, model) DO UPDATE SET"
+            " requests=requests+1, input=input+excluded.input, output=output+excluded.output,"
+            " cache_read=cache_read+excluded.cache_read, cache_write=cache_write+excluded.cache_write",
+            (day.isoformat(), model, u.input, u.output, u.cache_read, u.cache_write))
+        self.conn.commit()
+
+    def add_stage_counts(self, day: date, counts: dict[str, int]) -> None:
+        self.conn.executemany(
+            "INSERT INTO stage_counts VALUES (?,?,?) ON CONFLICT(day, stage) DO UPDATE SET n=n+excluded.n",
+            [(day.isoformat(), k, n) for k, n in counts.items()])
+        self.conn.commit()
+
+    def daily_report(self, limit: int = 14) -> list[dict]:
+        """Najnowsze dni: decyzje wg etapu, tokeny i szacowany koszt (None, gdy model spoza cennika)."""
+        days = [r[0] for r in self.conn.execute(
+            "SELECT day FROM stage_counts UNION SELECT day FROM llm_usage ORDER BY day DESC LIMIT ?", (limit,))]
+        out = []
+        for day in days:
+            stages = {r["stage"]: r["n"] for r in self.conn.execute(
+                "SELECT stage, n FROM stage_counts WHERE day=? ORDER BY stage", (day,))}
+            models, costs = {}, []
+            for r in self.conn.execute("SELECT * FROM llm_usage WHERE day=?", (day,)):
+                u = TokenUsage(r["input"], r["output"], r["cache_read"], r["cache_write"])
+                models[r["model"]] = {"requests": r["requests"], **u.__dict__}
+                costs.append(u.cost_usd(r["model"]))
+            out.append({"day": day, "stages": stages, "models": models,
+                        "cost_usd": None if None in costs else round(sum(costs), 4)})
+        return out
+
     # --- signals ---
     def insert_signal(self, s: Signal) -> int:
         lv = s.levels
@@ -139,6 +184,26 @@ class Database:
             "UPDATE signals SET status=?, closed_at=? WHERE id=?",
             (status.value, to_iso(closed_at) if closed_at else None, signal_id))
         self.conn.commit()
+
+    def record_outcome(self, signal_id: int, status: SignalStatus, on: date, closed_at: datetime | None = None,
+                       reason: str | None = None, result_r: float | None = None,
+                       result_pct: float | None = None) -> None:
+        """Zmiana wyniku z trackera; `on` = dzień rynku, w którym ją zapisano (maks. jedna dziennie)."""
+        self.conn.execute(
+            "UPDATE signals SET status=?, closed_at=?, close_reason=?, result_r=?, result_pct=?, last_outcome_on=?"
+            " WHERE id=?",
+            (status.value, to_iso(closed_at) if closed_at else None, reason, result_r, result_pct,
+             on.isoformat(), signal_id))
+        self.conn.commit()
+
+    def outcome_recorded_on(self, signal_id: int, day: date) -> bool:
+        return self.conn.execute("SELECT 1 FROM signals WHERE id=? AND last_outcome_on=?",
+                                 (signal_id, day.isoformat())).fetchone() is not None
+
+    def closed_signals_since(self, since: datetime) -> list[sqlite3.Row]:
+        """Opublikowane sygnały zamknięte od `since`."""
+        return self.conn.execute("SELECT * FROM signals WHERE closed_at>=? AND status<>? ORDER BY closed_at",
+                                 (to_iso(since), SignalStatus.UNPUBLISHED.value)).fetchall()
 
     def mark_published(self, signal_id: int, message_id: int | None) -> None:
         self.conn.execute("UPDATE signals SET telegram_message_id=?, status=? WHERE id=?",

@@ -1,5 +1,9 @@
 # Kalendarz zdarzeń: data -> lista opisów. "ticker:XXX" oznacza zdarzenie spółki (np. wyniki).
-# Uzupełniaj ręcznie albo generuj skryptem z kalendarza wyników.
+# Plik ręczny. Terminy raportów spółek z ESPI trafiają osobno do data/report_calendar.yaml.
+# RPP: terminy na 2027 i publikacje GUS po 24.11.2026 dopisz po ogłoszeniu
+# (nbp.pl – harmonogram posiedzeń RPP, stat.gov.pl – kalendarium).
+"2026-12-01":
+  - "Posiedzenie RPP (1. dzień)"
 "2026-12-02":
   - "Decyzja RPP w sprawie stóp procentowych"
 "2026-12-10":

@@ -27,7 +27,6 @@ import httpx
 import pandas as pd
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from .calendar import is_session_day
 from .prices import COLUMNS, parse_ohlcv_csv
 
 log = logging.getLogger(__name__)
@@ -213,11 +212,11 @@ def import_days(days: Iterable[date], client: GpwArchiveClient, store: PriceStor
 
 
 def session_days(start: date, end: date, holidays: Iterable[str] = ()) -> list[date]:
-    """Dni sesyjne z przedziału [start, end]: bez weekendów, świąt GPW i zamknięć z konfiguracji."""
+    """Dni robocze z przedziału [start, end] bez świąt z konfiguracji."""
     skip = set(holidays)
     out, d = [], start
     while d <= end:
-        if is_session_day(d, skip):
+        if d.weekday() < 5 and d.isoformat() not in skip:
             out.append(d)
         d += timedelta(days=1)
     return out

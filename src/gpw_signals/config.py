@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,7 @@ class Secrets(BaseSettings):
     telegram_bot_token: str = ""
     telegram_channel_id: str = ""
     telegram_test_channel_id: str = ""
+    telegram_admin_chat_id: str = ""   # prywatny czat na alerty i raport dzienny
 
 
 class FeedConfig(BaseModel):
@@ -28,6 +30,8 @@ class SourcesConfig(BaseModel):
     rss: list[FeedConfig] = Field(default_factory=list)
     broker_keywords: list[str] = Field(default_factory=list)
     macro_calendar_file: str = "data/macro_calendar.yaml"
+    fetch_report_schedules: bool = False   # pobieranie treści komunikatów z terminami raportów okresowych
+    report_calendar_file: str = "data/report_calendar.yaml"
 
 
 class ScheduleConfig(BaseModel):
@@ -56,11 +60,22 @@ class MarketConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
+    provider: Literal["anthropic", "ollama"] = "anthropic"
     model: str = "claude-opus-5-5"
     effort: str = "high"
     max_tokens: int = 16000
     max_tool_rounds: int = 8
     use_fallbacks: bool = True
+    # Tylko provider: ollama
+    base_url: str = "http://localhost:11434"
+    num_ctx: int = 8192
+    timeout_s: float = 300.0
+
+    @model_validator(mode="after")
+    def _local_model_name(self) -> AgentConfig:
+        if self.provider == "ollama" and self.model.startswith("claude"):
+            raise ValueError("provider: ollama wymaga nazwy lokalnego modelu w agent.model")
+        return self
 
 
 class LevelsConfig(BaseModel):
@@ -94,6 +109,11 @@ class ProcessingConfig(BaseModel):
     max_attempts: int = 3              # ile razy ponawiać news po błędzie przejściowym
 
 
+class PrefilterConfig(BaseModel):
+    enabled: bool = True
+    min_insider_value_pln: float = 200_000  # mniejsze transakcje osób blisko związanych = szum
+
+
 class PublishConfig(BaseModel):
     enabled: bool = True
     max_pending_minutes: int = 60      # po tym czasie nieopublikowany sygnał nie jest już wysyłany
@@ -101,6 +121,28 @@ class PublishConfig(BaseModel):
     include_thesis: bool = True
     post_outcomes: bool = True
     disclaimer: str = ""
+
+
+class TrackerConfig(BaseModel):
+    breakeven_after_t1: bool = False   # po T1 stop na środek strefy wejścia (od następnej sesji)
+    weekly_summary: bool = False       # podsumowanie skuteczności na kanale
+    weekly_summary_day: str = "fri"
+    weekly_summary_at: str = "19:00"
+
+
+class MonitoringConfig(BaseModel):
+    fail_threshold: int = 3            # alert po tylu awariach z rzędu
+    heartbeat_file: str = "data/heartbeat"
+    max_heartbeat_age_min: int = 30    # starszy znacznik = kontener "unhealthy"
+    daily_report: bool = True
+    daily_report_at: str = "19:15"     # po trackerze
+
+
+class LoggingConfig(BaseModel):
+    json_format: bool = False
+    file: str = ""                     # "" = tylko konsola; plik zapisuje wyłącznie `run`
+    max_mb: float = 10.0
+    backups: int = 5
 
 
 class Settings(BaseModel):
@@ -114,6 +156,10 @@ class Settings(BaseModel):
     levels: LevelsConfig = Field(default_factory=LevelsConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
+    prefilter: PrefilterConfig = Field(default_factory=PrefilterConfig)
+    tracker: TrackerConfig = Field(default_factory=TrackerConfig)
+    monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
+    logging: LoggingConfig = Field(default_factory=LoggingConfig)
     publish: PublishConfig = Field(default_factory=PublishConfig)
     secrets: Secrets = Field(default_factory=Secrets)
 

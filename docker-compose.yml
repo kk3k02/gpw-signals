@@ -7,6 +7,12 @@ services:
     env_file: .env
     environment:
       TZ: Europe/Warsaw
+    healthcheck:                # znacznik ostatniego udanego cyklu (monitoring.heartbeat_file)
+      test: ["CMD", "python", "-m", "gpw_signals", "health"]
+      interval: 5m
+      timeout: 30s
+      retries: 2
+      start_period: 40m         # pierwszy import notowań trwa ok. 20 min
     volumes:
       - ./config:/app/config:ro
       - ./data:/app/data        # baza SQLite, tickery, kalendarz, notowania

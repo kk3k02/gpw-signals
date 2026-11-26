@@ -6,4 +6,9 @@ data/*.sqlite
 # Notowania i surowe pliki z archiwum GPW – pobierane lokalnie (fetch-prices), nie w repo
 data/prices/
 data/raw/
+# Terminy raportów generowane z komunikatów ESPI
+data/report_calendar.yaml
+# Logi i znacznik życia bota
+data/logs/
+data/heartbeat*
 .pytest_cache/
