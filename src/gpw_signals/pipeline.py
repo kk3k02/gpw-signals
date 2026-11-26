@@ -19,7 +19,7 @@ from .db import Database
 from .ingest.base import Source, fetch_all
 from .ingest.macro import EventCalendar
 from .ingest.report_schedule import ReportCalendar, ScheduleError, extract_body, fetch_page, is_report_schedule
-from .ingest.rss_portals import RssSource
+from .ingest.rss_portals import RssSource, needs_body
 from .levels.engine import compute_levels
 from .levels.validate import validate_levels
 from .mapping import TickerMap
@@ -113,8 +113,18 @@ class App:
         self.publish_pending()
 
         news = fetch_all(self.sources, self._source_result)
-        new = 0
+        pc = self.settings.processing
+        max_age = timedelta(hours=pc.max_news_age_hours)
+        now = self.clock()
+        new, body_fetches = 0, 0
         for n in news:
+            if now - n.published_at > max_age:
+                # Odrzucamy już przy pobraniu: stary news nie trafia do bazy ani kolejki (#7)
+                self.cycle_stats["news:za stary"] += 1
+                continue
+            if self._wants_body(n) and body_fetches < self.settings.sources.max_body_fetches:
+                body_fetches += 1
+                self._fill_body(n)
             n.tickers = self.tickers.map_news(n.title, n.summary, n.kind)
             new += self.db.insert_news_if_new(n)
         if new:
@@ -123,9 +133,6 @@ class App:
         log.info("Nowych newsów: %d (z %d), w kolejce: %d", new, len(news), len(queue))
 
         regime = self._regime()
-        pc = self.settings.processing
-        max_age = timedelta(hours=pc.max_news_age_hours)
-        now = self.clock()
         published: list[Signal] = []
         for n in queue:
             if now - n.published_at > max_age:
@@ -187,6 +194,21 @@ class App:
             raise
         self.monitor.ok("agent")
         return a
+
+    def _wants_body(self, n: NewsItem) -> bool:
+        return (self.settings.sources.fetch_espi_body and n.kind == SourceKind.ESPI and bool(n.url)
+                and needs_body(n) and not self.db.has_news(n.uid))
+
+    def _fill_body(self, n: NewsItem) -> None:
+        """Treść komunikatu ze strony, gdy RSS ma tylko tytuł. Błąd = zostaje to, co dał RSS."""
+        try:
+            body = extract_body(self.fetch_page(n.url))
+        except Exception as e:  # noqa: BLE001 – sieć: news idzie dalej z samym tytułem
+            log.warning("Treść komunikatu %s: %s", n.url, e)
+            return
+        if body:
+            n.summary = body[:2000]
+            self.cycle_stats["news:pobrana treść"] += 1
 
     def _is_schedule(self, n: NewsItem) -> bool:
         # Dry-run ma nie zostawiać śladów, a ten import zapisuje plik

@@ -32,6 +32,8 @@ class SourcesConfig(BaseModel):
     broker_keywords: list[str] = Field(default_factory=list)
     macro_calendar_file: str = "data/macro_calendar.yaml"
     fetch_report_schedules: bool = False   # pobieranie treści komunikatów z terminami raportów okresowych
+    fetch_espi_body: bool = False          # pobieranie treści komunikatu ESPI, gdy RSS ma tylko tytuł (#7)
+    max_body_fetches: int = 10             # limit pobrań stron komunikatów na cykl
     report_calendar_file: str = "data/report_calendar.yaml"
 
 
