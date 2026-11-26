@@ -61,6 +61,25 @@ python -m gpw_signals usage                # newsy wg etapu, tokeny i szacowany 
 - **Prawo:** publiczne sygnały kup/cel/SL to w UE rekomendacje inwestycyjne (MAR art. 20, rozporządzenie 2016/958, nadzór KNF). Przed uruchomieniem publicznego kanału skonsultuj się z prawnikiem.
 - Na start `publish.use_test_channel: true`. Kanał docelowy włączaj dopiero po okresie testów i analizie `stats`.
 
+## Uruchomienie w Dockerze
+
+1. Uzupełnij `.env` (na podstawie `.env.example`).
+2. Zbuduj i uruchom bota w tle:
+
+   ```bash
+   docker compose up -d --build
+   docker compose logs -f
+   ```
+
+`config/` (tylko do odczytu) i `data/` (baza SQLite, notowania) są montowane z hosta, więc dane przetrwają przebudowę obrazu.
+Pozostałe komendy CLI uruchamiasz w kontenerze, np.:
+
+```bash
+docker compose run --rm gpw-signals python -m gpw_signals fetch-prices
+docker compose run --rm gpw-signals python -m gpw_signals stats
+docker compose run --rm gpw-signals python -m gpw_signals once --dry-run
+```
+
 ## Lokalny model (Ollama)
 
 Zamiast API Anthropic newsy może oceniać lokalny model, bez kosztów API i bez `ANTHROPIC_API_KEY`:

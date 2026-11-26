@@ -1,8 +1,12 @@
 services:
   gpw-signals:
     build: .
+    image: gpw-signals:latest
+    container_name: gpw-signals
     restart: unless-stopped
     env_file: .env
+    environment:
+      TZ: Europe/Warsaw
     healthcheck:                # znacznik ostatniego udanego cyklu (monitoring.heartbeat_file)
       test: ["CMD", "python", "-m", "gpw_signals", "health"]
       interval: 5m
@@ -11,4 +15,9 @@ services:
       start_period: 40m         # pierwszy import notowań trwa ok. 20 min
     volumes:
       - ./config:/app/config:ro
-      - ./data:/app/data        # baza SQLite + tickery + kalendarz
+      - ./data:/app/data        # baza SQLite, tickery, kalendarz, notowania
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
