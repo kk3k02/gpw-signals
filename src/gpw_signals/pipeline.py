@@ -25,6 +25,7 @@ from .levels.validate import validate_levels
 from .mapping import TickerMap
 from .market import gpw_archive
 from .market.indicators import snapshot
+from .market.intraday import IntradayProvider, NoIntraday, SessionPhase, fresh_quote, make_intraday, session_phase
 from .market.prices import PriceProvider, make_provider
 from .market.quality import data_issues
 from .market.regime import Regime, market_regime
@@ -66,6 +67,8 @@ class App:
     # Pobieranie strony komunikatu (terminy raportów) – podmieniane w testach
     fetch_page: Callable[[str], str] = field(default=fetch_page)
     monitor: Monitor = field(default_factory=Monitor)
+    # Bieżący kurs w sesji (#4); brak = świece dzienne
+    intraday: IntradayProvider = field(default_factory=NoIntraday)
     # Statystyki ostatniego cyklu: wywołania LLM i decyzje podjęte bez LLM, wg etapu (#5)
     cycle_stats: Counter = field(default_factory=Counter)
 
@@ -99,6 +102,7 @@ class App:
             publisher = TelegramPublisher(sec.telegram_bot_token, chat)
         app = cls(settings, db, tickers, prices, calendar, sources, publisher, dry_run=dry_run)
         app.monitor = Monitor(threshold=settings.monitoring.fail_threshold)
+        app.intraday = make_intraday(m.intraday_provider, m.intraday_dir)
         if not dry_run and sec.telegram_bot_token and sec.telegram_admin_chat_id:
             app.monitor.notify = TelegramPublisher(sec.telegram_bot_token, sec.telegram_admin_chat_id).send
         app.assessor = make_assessor(settings.agent, ToolContext(prices, tickers, db, calendar))
@@ -250,11 +254,14 @@ class App:
         issues = data_issues(df, market_date(self.clock(), self.tz), m.max_data_age_days, m.max_jump_pct)
         if issues:
             return self._skip("dane", f"{ticker}: dane – {'; '.join(issues)}")
+        live = self._live_price(company.symbol)
         try:
             snap = snapshot(df, self.settings.levels.atr_period,
-                            self.settings.levels.swing_window, self.settings.levels.swing_lookback)
+                            self.settings.levels.swing_window, self.settings.levels.swing_lookback,
+                            live_price=live, session_date=market_date(self.clock(), self.tz))
         except ValueError as e:
             return self._skip("historia", f"{ticker}: {e}")
+        phase = session_phase(n.published_at, self.tz, m.session_open, m.session_close)
 
         # #5: wszystko, co nie zależy od oceny agenta, sprawdzamy PRZED kosztownym wywołaniem LLM
         lr = compute_levels(snap, self.settings.levels, company.liquidity_band)
@@ -295,8 +302,24 @@ class App:
         self.db.insert_signal(sig)
         self.cycle_stats["sygnał"] += 1
         if self._publish(sig):
-            return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f}"
-        return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} – publikacja do ponowienia"
+            return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}, kurs {snap.price_source})"
+        return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}) – publikacja do ponowienia"
+
+    def _live_price(self, symbol: str) -> float | None:
+        """Bieżący kurs tylko w trakcie sesji i tylko świeży; inaczej None = świece dzienne (#4).
+        News przed sesją (ESPI 7:00–9:00) jest więc oceniany od wczorajszego zamknięcia."""
+        m = self.settings.market
+        now = self.clock()
+        if session_phase(now, self.tz, m.session_open, m.session_close) != SessionPhase.IN:
+            return None
+        try:
+            q = fresh_quote(self.intraday, symbol, now, self.tz, m.intraday_max_age_min, m.session_open)
+        except Exception as e:  # noqa: BLE001 – awaria intraday nie blokuje oceny
+            self.monitor.fail("kurs intraday", f"{symbol}: {e}")
+            return None
+        if q is None:
+            log.debug("%s: brak świeżego kursu intraday – świece dzienne", symbol)
+        return q.price if q else None
 
     def _skip(self, stage: str, decision: str) -> tuple[None, str]:
         """Decyzja podjęta bez wywołania LLM – liczona, żeby było widać oszczędność."""

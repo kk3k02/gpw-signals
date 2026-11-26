@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 import numpy as np
 import pandas as pd
@@ -53,28 +54,38 @@ class Snapshot:
     low_52w: float
     resistances: list[float]
     supports: list[float]
+    price_source: str = "daily"   # "daily" (świece dzienne) | "intraday" (bieżący kurs w sesji, #4)
 
     def to_dict(self) -> dict:
         return {k: (round(v, 4) if isinstance(v, float) and not np.isnan(v) else v)
                 for k, v in self.__dict__.items()}
 
 
-def snapshot(df: pd.DataFrame, atr_period: int = 14, swing_window: int = 5, swing_lookback: int = 120) -> Snapshot:
+def snapshot(df: pd.DataFrame, atr_period: int = 14, swing_window: int = 5, swing_lookback: int = 120,
+             live_price: float | None = None, session_date: date | None = None) -> Snapshot:
+    """Bez `live_price` – wszystko z dziennych świec. Z `live_price` (#4): `close` to bieżący kurs,
+    a `prev_close`/`change_pct` liczone od wczorajszego zamknięcia. Niepełna dzisiejsza świeca
+    (data == session_date) jest wtedy pomijana jako "wczoraj"."""
     if len(df) < max(30, atr_period + 2):
         raise ValueError(f"Za mało notowań ({len(df)}) do policzenia wskaźników")
     close = df["close"]
     vol = df["volume"]
     res, sup = swing_points(df, swing_window, swing_lookback)
     avg_vol = float(vol.tail(21).iloc[:-1].mean()) or 1.0
+    last, prev, source = float(close.iloc[-1]), float(close.iloc[-2]), "daily"
+    if live_price is not None:
+        today_bar = session_date is not None and pd.Timestamp(df.index[-1]).date() == session_date
+        prev = float(close.iloc[-2]) if today_bar else float(close.iloc[-1])
+        last, source = float(live_price), "intraday"
     return Snapshot(
-        close=float(close.iloc[-1]),
-        prev_close=float(close.iloc[-2]),
+        close=last,
+        prev_close=prev,
         atr=atr(df, atr_period),
         sma20=sma(close, 20), sma50=sma(close, 50), sma200=sma(close, 200),
         avg_turnover_20=float((close * vol).tail(20).mean()),
         volume_ratio=float(vol.iloc[-1]) / avg_vol,
-        change_pct=float(close.iloc[-1] / close.iloc[-2] - 1) * 100,
+        change_pct=(last / prev - 1) * 100,
         high_52w=float(df["high"].tail(250).max()),
         low_52w=float(df["low"].tail(250).min()),
-        resistances=res, supports=sup,
+        resistances=res, supports=sup, price_source=source,
     )
