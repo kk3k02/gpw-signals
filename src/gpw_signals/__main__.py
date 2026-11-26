@@ -1,4 +1,4 @@
-"""CLI: python -m gpw_signals {run,once,track,stats,backtest,preview}"""
+"""CLI: python -m gpw_signals {run,once,track,stats,backtest,preview,export-signals,prune-signals,...}"""
 from __future__ import annotations
 
 import argparse
@@ -43,11 +43,20 @@ def main(argv: list[str] | None = None) -> int:
     bt.add_argument("--to", dest="end", type=date.fromisoformat)
     bt.add_argument("--news", default="data/backtest/news.yaml", help="Zbiór historycznych newsów (YAML)")
     bt.add_argument("--details", action="store_true", help="Wypisz decyzję dla każdego newsa")
+    ex = sub.add_parser("export-signals", help="Eksport archiwum opublikowanych sygnałów (CSV/JSON)")
+    ex.add_argument("--format", choices=["csv", "json"], default="csv")
+    ex.add_argument("--out", help="Plik wynikowy (domyślnie: standardowe wyjście)")
+    ex.add_argument("--from", dest="start", type=date.fromisoformat, help="Od dnia YYYY-MM-DD (włącznie)")
+    ex.add_argument("--to", dest="end", type=date.fromisoformat, help="Do dnia YYYY-MM-DD (włącznie)")
+    pr = sub.add_parser("prune-signals", help="Usuń zamknięte sygnały starsze niż archive.retention_days")
+    pr.add_argument("--yes", action="store_true", help="Potwierdź usunięcie (bez tego tylko informacja)")
     pv = sub.add_parser("preview", help="Policz i pokaż poziomy dla spółki (bez LLM i bez wysyłki)")
     pv.add_argument("ticker")
     args = p.parse_args(argv)
 
     s = load_settings(args.config)
+    if args.cmd in ("export-signals", "prune-signals"):  # bez App: nie wymaga tokenów
+        return _archive(s, args)
     if args.cmd == "health":  # bez App: healthcheck ma być lekki i niezależny od tokenów
         return _health(s)
     setup_logging(s.logging, args.verbose, to_file=args.cmd == "run")
@@ -91,6 +100,38 @@ def main(argv: list[str] | None = None) -> int:
                 print(tk, dict(backtest_levels(df, s.levels, args.horizon, band=c.liquidity_band)))
         else:
             _preview(app, args.ticker)
+    return 0
+
+
+def _archive(s, args) -> int:
+    from datetime import datetime, time
+    from pathlib import Path
+    from zoneinfo import ZoneInfo
+
+    from . import archive
+    from .db import Database
+
+    db = Database(s.db_path)
+    if args.cmd == "prune-signals":
+        days = s.archive.retention_days
+        if days is None:
+            print("Retencja wyłączona (archive.retention_days puste) – nic nie usunięto")
+            return 0
+        if not args.yes:
+            print(f"Usunięte zostałyby zamknięte sygnały starsze niż {days} dni. Uruchom z --yes.")
+            return 0
+        print(f"Usunięto sygnałów: {archive.prune(db.conn, days, utc_now())}")
+        return 0
+    tz = ZoneInfo(s.timezone)
+    since = datetime.combine(args.start, time(), tz) if args.start else None
+    until = datetime.combine(args.end + timedelta(days=1), time(), tz) if args.end else None
+    rows = archive.published_signals(db.conn, since, until)
+    text = archive.to_csv(rows) if args.format == "csv" else archive.to_json(rows)
+    if args.out:
+        Path(args.out).write_text(text, encoding="utf-8")
+        print(f"Zapisano {len(rows)} sygnałów do {args.out}")
+    else:
+        sys.stdout.write(text)
     return 0
 
 
