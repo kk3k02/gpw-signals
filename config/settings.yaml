@@ -22,6 +22,9 @@ sources:
     # rss/rekomendacje.xml zwraca pusty dokument (sprawdzone 2026-11-26) i nie ma go na bankier.pl/rss.
     # Zamiast niego feed giełdowy: rekomendacje DM wyłapują z niego broker_keywords poniżej.
     - {name: bankier-gielda, kind: portal, priority: 2, url: "https://www.bankier.pl/rss/gielda.xml"}
+    # Komunikaty GPW (zawieszenia, dywidendy, zmiany notowań) dla wszystkich spółek – oficjalny RSS
+    # z gpw.pl/_rss; robots.txt nie blokuje, zastrzeżenia prawne nie zabraniają (docs/news_sources.md).
+    - {name: gpw-komunikaty, kind: portal, priority: 2, enabled: false, url: "https://www.gpw.pl/rss_komunikaty"}
   # Po tych rdzeniach news z portalu traktujemy jako rekomendację DM (wszystkie rdzenie frazy muszą wystąpić)
   broker_keywords: ["rekomendac", "cen docelow", "kupuj", "akumuluj"]
   # Kalendarz makro/wyników – ręcznie lub z pliku (YYYY-MM-DD: opis)
