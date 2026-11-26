@@ -1,0 +1,14 @@
+# Oznaczone newsy do porównania modeli (eval-agent). Treści są FIKCYJNE, a etykiety to propozycja
+# do przejrzenia przez właściciela repo. signal = czy powinien powstać sygnał long; strength = zakres siły.
+- {kind: espi, ticker: PKN, signal: true, strength: [0.6, 1.0], title: "ORLEN S.A.: Zawarcie znaczącej umowy", summary: "Emitent zawarł umowę sprzedaży o wartości 12 mld zł na 3 lata, niezapowiadaną wcześniej, z marżą powyżej średniej spółki."}
+- {kind: espi, ticker: LPP, signal: true, strength: [0.6, 1.0], title: "LPP S.A.: Wstępne wyniki finansowe", summary: "Zysk netto kwartału 900 mln zł wobec 600 mln zł oczekiwanych przez rynek; spółka podnosi prognozę roczną."}
+- {kind: espi, ticker: CDR, signal: true, strength: [0.8, 1.0], title: "CD PROJEKT S.A.: Wezwanie do zapisywania się na sprzedaż akcji", summary: "Wzywający oferuje cenę o 35% wyższą od ostatniego kursu za 100% akcji."}
+- {kind: espi, ticker: KGH, signal: true, strength: [0.5, 1.0], title: "KGHM Polska Miedź S.A.: Rekomendacja wypłaty dywidendy", summary: "Zarząd rekomenduje dywidendę z niespodziewaną stopą 9%; rynek zakładał brak wypłaty."}
+- {kind: espi, ticker: PZU, signal: true, strength: [0.4, 0.9], title: "PZU S.A.: Uchwalenie programu skupu akcji własnych", summary: "Skup do 8% kapitału po cenie do 15% powyżej kursu, start w przyszłym tygodniu."}
+- {kind: espi, ticker: PKN, signal: false, strength: [0.0, 0.4], title: "ORLEN S.A.: Aneks do umowy linii gwarancyjnej", summary: "Przedłużenie rutynowej linii gwarancyjnej o rok na niezmienionych warunkach."}
+- {kind: espi, ticker: PKO, signal: false, strength: [0.0, 0.4], title: "PKO BP S.A.: Rejestracja zmian statutu", summary: "Sąd zarejestrował porządkowe zmiany statutu."}
+- {kind: espi, ticker: LPP, signal: false, strength: [0.0, 1.0], title: "LPP S.A.: Odpis aktualizujący i obniżenie prognozy", summary: "Spółka tworzy odpis 400 mln zł i obniża prognozę zysku o 30%."}
+- {kind: espi, ticker: CDR, signal: false, strength: [0.0, 1.0], title: "CD PROJEKT S.A.: Przesunięcie premiery", summary: "Premiera głównej gry opóźniona o 12 miesięcy."}
+- {kind: portal, ticker: KGH, signal: false, strength: [0.0, 0.4], title: "KGHM sponsorem turnieju siatkówki", summary: "Spółka wsparła lokalny turniej kwotą 100 tys. zł."}
+- {kind: portal, ticker: PZU, signal: false, strength: [0.0, 0.5], title: "PZU: co dalej z kursem? Analiza techniczna", summary: "Autor wskazuje wsparcia i opory, bez nowych informacji o spółce."}
+- {kind: espi, ticker: PEO, signal: false, strength: [0.0, 1.0], title: "Bank Pekao S.A.: Emisja akcji z wyłączeniem prawa poboru", summary: "Emisja 20% nowych akcji z dyskontem 15% do kursu."}

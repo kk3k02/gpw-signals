@@ -28,6 +28,10 @@ def main(argv: list[str] | None = None) -> int:
     fp = sub.add_parser("fetch-prices", help="Import notowań dziennych z archiwum GPW do data/prices")
     fp.add_argument("--from", dest="start", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: od braków)")
     fp.add_argument("--to", dest="end", type=date.fromisoformat, help="YYYY-MM-DD (domyślnie: dziś)")
+    ev = sub.add_parser("eval-agent", help="Jakość oceny na oznaczonych newsach (wywołuje model!)")
+    ev.add_argument("--cases", default="data/eval/agent_cases.yaml")
+    ev.add_argument("--provider", choices=["anthropic", "ollama"])
+    ev.add_argument("--model")
     sub.add_parser("usage", help="Newsy wg etapu, tokeny i koszt LLM na dzień")
     sub.add_parser("health", help="Kod wyjścia 1, gdy bot nie kończy cykli (healthcheck)")
     sub.add_parser("stats", help="Statystyki skuteczności")
@@ -62,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Sesji: {summary.sessions}, dni bez sesji: {summary.no_session}, wierszy: {summary.rows}")
     elif args.cmd == "track":
         App.build(s).track()
+    elif args.cmd == "eval-agent":
+        _eval_agent(s, args)
     elif args.cmd == "usage":
         from .db import Database
         print(json.dumps(Database(s.db_path).daily_report(), indent=2, ensure_ascii=False))
@@ -160,6 +166,19 @@ def _preview(app, ticker: str) -> None:
     a = Assessment(ticker, True, "long", "inne", 0.0, 10, False, "(podgląd – bez oceny agenta)")
     print(format_signal(Signal(ticker, c.name, lr.levels, 0.0, a, "", utc_now())))
     print("Walidacja:", validate_levels(lr.levels, app.settings.filters.min_rr_t1) or "OK")
+
+
+def _eval_agent(s, args) -> None:
+    from .agent.evaluate import load_cases, run_cases
+    from .config import AgentConfig
+    from .mapping import TickerMap
+
+    over = {k: v for k, v in (("provider", args.provider), ("model", args.model)) if v}
+    cfg = AgentConfig(**{**s.agent.model_dump(), **over})
+    r = run_cases(load_cases(args.cases), cfg, TickerMap.from_csv(s.tickers_csv))
+    print(*r.details, sep="\n")
+    print(f"{cfg.provider}/{cfg.model}: przypadków {r.total}, błędów {r.errors}, fałszywych sygnałów "
+          f"{r.false_positives}, przeoczonych {r.false_negatives}, siła w zakresie {r.strength_in_range}")
 
 
 if __name__ == "__main__":

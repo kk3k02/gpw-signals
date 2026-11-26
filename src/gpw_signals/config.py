@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,11 +60,22 @@ class MarketConfig(BaseModel):
 
 
 class AgentConfig(BaseModel):
+    provider: Literal["anthropic", "ollama"] = "anthropic"
     model: str = "claude-opus-5-5"
     effort: str = "high"
     max_tokens: int = 16000
     max_tool_rounds: int = 8
     use_fallbacks: bool = True
+    # Tylko provider: ollama
+    base_url: str = "http://localhost:11434"
+    num_ctx: int = 8192
+    timeout_s: float = 300.0
+
+    @model_validator(mode="after")
+    def _local_model_name(self) -> AgentConfig:
+        if self.provider == "ollama" and self.model.startswith("claude"):
+            raise ValueError("provider: ollama wymaga nazwy lokalnego modelu w agent.model")
+        return self
 
 
 class LevelsConfig(BaseModel):

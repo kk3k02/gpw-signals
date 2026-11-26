@@ -6,6 +6,8 @@ from dataclasses import astuple, dataclass
 # USD za 1 mln tokenów: (wejście, wyjście, odczyt cache, zapis cache 5 min)
 PRICES = {"claude-opus-5-5": (4.0, 20.0, 0.20, 5.0)}
 
+LOCAL_PREFIX = "ollama/"  # modele lokalne: bez kosztu API
+
 
 @dataclass
 class TokenUsage:
@@ -23,5 +25,7 @@ class TokenUsage:
 
     def cost_usd(self, model: str) -> float | None:
         """None = model spoza cennika (np. zapasowy) – lepiej brak kosztu niż zły koszt."""
+        if model.startswith(LOCAL_PREFIX):
+            return 0.0
         price = PRICES.get(model)
         return sum(n * p for n, p in zip(astuple(self), price, strict=True)) / 1e6 if price else None

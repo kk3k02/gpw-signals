@@ -10,7 +10,8 @@ from zoneinfo import ZoneInfo
 
 import anthropic
 
-from .agent.assess import AgentError, NewsAssessor
+from .agent.base import AgentError, AgentUnavailable, Assessor
+from .agent.factory import make_assessor
 from .agent.tools import ToolContext
 from .clock import market_date, market_day_bounds, utc_now
 from .config import Settings
@@ -44,7 +45,7 @@ class TransientError(Exception):
 
 
 def _is_transient_api_error(e: Exception) -> bool:
-    if isinstance(e, anthropic.APIConnectionError | anthropic.RateLimitError):
+    if isinstance(e, AgentUnavailable | anthropic.APIConnectionError | anthropic.RateLimitError):
         return True
     return isinstance(e, anthropic.APIStatusError) and e.status_code >= 500
 
@@ -58,7 +59,7 @@ class App:
     calendar: EventCalendar
     sources: list[Source]
     publisher: Publisher
-    assessor: NewsAssessor | None = None
+    assessor: Assessor | None = None
     dry_run: bool = False
     # Źródło czasu (aware UTC) – podmieniane w testach
     clock: Callable[[], datetime] = field(default=utc_now)
@@ -100,7 +101,7 @@ class App:
         app.monitor = Monitor(threshold=settings.monitoring.fail_threshold)
         if not dry_run and sec.telegram_bot_token and sec.telegram_admin_chat_id:
             app.monitor.notify = TelegramPublisher(sec.telegram_bot_token, sec.telegram_admin_chat_id).send
-        app.assessor = NewsAssessor(settings.agent, ToolContext(prices, tickers, db, calendar))
+        app.assessor = make_assessor(settings.agent, ToolContext(prices, tickers, db, calendar))
         app.assessor.on_usage = lambda model, u: db.add_usage(app.today(), model, u)
         return app
 
@@ -253,7 +254,7 @@ class App:
             return None, f"{ticker}: agent – {e}"
         except Exception as e:
             if _is_transient_api_error(e):
-                raise TransientError(f"{ticker}: API Claude ({type(e).__name__}: {e})") from e
+                raise TransientError(f"{ticker}: model ({type(e).__name__}: {e})") from e
             raise
 
         sr = score_signal(a, snap, lr.levels, regime, n.kind, f,
