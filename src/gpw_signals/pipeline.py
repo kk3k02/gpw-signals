@@ -93,7 +93,8 @@ class App:
         prices = make_provider(m.provider, m.stooq_url, m.csv_dir)
         calendar = EventCalendar(settings.sources.macro_calendar_file, ZoneInfo(settings.timezone),
                                  extra=[settings.sources.report_calendar_file])
-        sources: list[Source] = [RssSource(f, settings.sources.broker_keywords) for f in settings.sources.rss]
+        sources: list[Source] = [RssSource(f, settings.sources.broker_keywords) for f in settings.sources.rss
+                                   if f.enabled]
         sec = settings.secrets
         if dry_run or not settings.publish.enabled:
             publisher: Publisher = DryRunPublisher()

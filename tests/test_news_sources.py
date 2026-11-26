@@ -81,3 +81,20 @@ def test_settings_have_no_dead_broker_feed():
     urls = [f.url for f in s.sources.rss]
     assert not any("rekomendacje.xml" in u for u in urls)
     assert not s.sources.fetch_espi_body       # włączane świadomie, po sprawdzeniu regulaminu
+
+
+def test_gpw_komunikaty_feed_parsed_offline():
+    raw = (FIX / "gpw_komunikaty.xml").read_bytes()
+    items = parse_feed(raw, FeedConfig(name="gpw-komunikaty", kind="portal", url="x", priority=2))
+    assert len(items) == 2
+    assert items[0].title == "ASBIS Enterprises PLC"
+    assert items[0].url.startswith("https://www.gpw.pl/komunikaty-gpw?")
+    assert items[0].published_at == datetime(2026, 11, 12, 15, 43, 46, tzinfo=UTC)
+    assert "dywidendy" in items[0].summary
+
+
+def test_new_sources_disabled_by_default():
+    s = load_settings()
+    gpw = next(f for f in s.sources.rss if f.name == "gpw-komunikaty")
+    assert not gpw.enabled
+    assert FeedConfig(name="a", kind="portal", url="x").enabled

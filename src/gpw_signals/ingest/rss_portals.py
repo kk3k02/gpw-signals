@@ -14,6 +14,9 @@ from ..models import NewsItem, SourceKind
 _TAG = re.compile(r"<[^>]+>")
 
 
+_GPW_SUFFIX = re.compile(r"\s*\((?:Komunikat|Uchwała)\)$")
+
+
 def _clean(text: str) -> str:
     return html.unescape(_TAG.sub(" ", text or "")).strip()
 
@@ -38,6 +41,8 @@ def parse_feed(raw: str | bytes, cfg: FeedConfig, keywords: list[str] | None = N
     out: list[NewsItem] = []
     for e in feed.entries:
         title, summary = _clean(e.get("title", "")), _clean(e.get("summary", ""))
+        # gpw.pl/rss_komunikaty: "SPÓŁKA S.A. (Komunikat)" – sufiks nic nie wnosi do mapowania
+        title = _GPW_SUFFIX.sub("", title)
         kind = SourceKind(cfg.kind)
         # Na portalach wyłapujemy rekomendacje DM po słowach kluczowych
         if keywords and kind == SourceKind.PORTAL:
