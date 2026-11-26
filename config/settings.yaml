@@ -116,6 +116,19 @@ tracker:
   weekly_summary_day: fri
   weekly_summary_at: "19:00"     # po trackerze (schedule.tracker_at)
 
+monitoring:                      # alerty idą na TELEGRAM_ADMIN_CHAT_ID z .env (puste = tylko logi)
+  fail_threshold: 3              # alert po tylu awariach z rzędu (źródło, agent, notowania, cykl)
+  heartbeat_file: data/heartbeat # znacznik ostatniego udanego cyklu dla `health`
+  max_heartbeat_age_min: 30
+  daily_report: true
+  daily_report_at: "19:15"       # po trackerze (schedule.tracker_at)
+
+logging:
+  json_format: false             # true = jeden obiekt JSON na linię
+  file: data/logs/gpw-signals.log
+  max_mb: 10
+  backups: 5
+
 publish:
   enabled: true                  # wyłącznik awaryjny
   max_pending_minutes: 60        # sygnał nieopublikowany dłużej -> "unpublished", bez wysyłki

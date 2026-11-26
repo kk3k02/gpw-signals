@@ -28,7 +28,8 @@ from .market.indicators import snapshot
 from .market.prices import PriceProvider, make_provider
 from .market.quality import data_issues
 from .market.regime import Regime, market_regime
-from .models import NewsItem, Signal, SignalStatus, SourceKind
+from .models import Assessment, NewsItem, Signal, SignalStatus, SourceKind
+from .monitor import Monitor, format_daily_report
 from .prefilter import noise_reason
 from .publish.formatter import format_outcome, format_signal, format_weekly_summary
 from .publish.telegram import DryRunPublisher, Publisher, TelegramPublisher
@@ -64,6 +65,7 @@ class App:
     clock: Callable[[], datetime] = field(default=utc_now)
     # Pobieranie strony komunikatu (terminy raportów) – podmieniane w testach
     fetch_page: Callable[[str], str] = field(default=fetch_page)
+    monitor: Monitor = field(default_factory=Monitor)
     # Statystyki ostatniego cyklu: wywołania LLM i decyzje podjęte bez LLM, wg etapu (#5)
     cycle_stats: Counter = field(default_factory=Counter)
 
@@ -96,6 +98,9 @@ class App:
             chat = sec.telegram_test_channel_id if settings.publish.use_test_channel else sec.telegram_channel_id
             publisher = TelegramPublisher(sec.telegram_bot_token, chat)
         app = cls(settings, db, tickers, prices, calendar, sources, publisher, dry_run=dry_run)
+        app.monitor = Monitor(threshold=settings.monitoring.fail_threshold)
+        if not dry_run and sec.telegram_bot_token and sec.telegram_admin_chat_id:
+            app.monitor.notify = TelegramPublisher(sec.telegram_bot_token, sec.telegram_admin_chat_id).send
         app.assessor = make_assessor(settings.agent, ToolContext(prices, tickers, db, calendar))
         app.assessor.on_usage = lambda model, u: db.add_usage(app.today(), model, u)
         return app
@@ -107,11 +112,13 @@ class App:
         self.cycle_stats = Counter()
         self.publish_pending()
 
-        news = fetch_all(self.sources)
+        news = fetch_all(self.sources, self._source_result)
         new = 0
         for n in news:
             n.tickers = self.tickers.map_news(n.title, n.summary, n.kind)
             new += self.db.insert_news_if_new(n)
+        if new:
+            self.cycle_stats["news:nowe"] = new
         queue = self.db.pending_news()
         log.info("Nowych newsów: %d (z %d), w kolejce: %d", new, len(news), len(queue))
 
@@ -166,6 +173,21 @@ class App:
         self.db.add_stage_counts(self.today(), self.cycle_stats)
         return published
 
+    def _source_result(self, name: str, error: Exception | None) -> None:
+        if error is None:
+            self.monitor.ok(f"źródło {name}")
+        else:
+            self.monitor.fail(f"źródło {name}", error)
+
+    def _assess(self, n: NewsItem, ticker: str, company: str) -> Assessment:
+        try:
+            a = self.assessor.assess(n, ticker, company)
+        except Exception as e:
+            self.monitor.fail("agent", f"{type(e).__name__}: {e}")
+            raise
+        self.monitor.ok("agent")
+        return a
+
     def _is_schedule(self, n: NewsItem) -> bool:
         # Dry-run ma nie zostawiać śladów, a ten import zapisuje plik
         return (self.settings.sources.fetch_report_schedules and not self.dry_run
@@ -199,7 +221,9 @@ class App:
         try:
             df = self.prices.daily(company.symbol, self.settings.market.history_days)
         except Exception as e:
+            self.monitor.fail("notowania", f"{ticker}: {e}")
             raise TransientError(f"{ticker}: brak notowań ({e})") from e
+        self.monitor.ok("notowania")
         m = self.settings.market
         issues = data_issues(df, market_date(self.clock(), self.tz), m.max_data_age_days, m.max_jump_pct)
         if issues:
@@ -223,7 +247,7 @@ class App:
 
         self.cycle_stats["llm"] += 1
         try:
-            a = self.assessor.assess(n, ticker, company.name)
+            a = self._assess(n, ticker, company.name)
         except AgentError as e:  # odmowa, przekroczone limity – ponowienie nic nie da
             log.warning("Agent %s: %s", ticker, e)
             self.cycle_stats["po_llm:błąd agenta"] += 1
@@ -260,7 +284,8 @@ class App:
     def _log_cycle_stats(self) -> None:
         st = self.cycle_stats
         skipped = sum(v for k, v in st.items() if k.startswith("bez_llm:"))
-        detail = ", ".join(f"{k.removeprefix('bez_llm:')}={v}" for k, v in sorted(st.items()) if k != "llm")
+        detail = ", ".join(f"{k.removeprefix('bez_llm:')}={v}" for k, v in sorted(st.items())
+                           if k not in ("llm", "news:nowe"))
         log.info("Wywołania LLM: %d, decyzje bez LLM: %d%s", st["llm"], skipped, f" ({detail})" if detail else "")
 
     # ---------------------------------------------------------------- publikacja
@@ -270,7 +295,9 @@ class App:
             msg_id = self.publisher.send(format_signal(sig, p.include_thesis, p.disclaimer))
         except Exception as e:  # noqa: BLE001 – każda awaria wysyłki = ponowienie z bazy
             log.warning("Publikacja sygnału %s (%s) nieudana: %s", sig.id, sig.ticker, e)
+            self.monitor.fail("publikacja", e, threshold=1)
             return False
+        self.monitor.ok("publikacja")
         self.db.mark_published(sig.id, msg_id)
         sig.telegram_message_id, sig.status = msg_id, SignalStatus.ACTIVE
         return True
@@ -299,8 +326,11 @@ class App:
 
     def _regime(self) -> Regime:
         try:
-            return market_regime(self.prices.daily(self.settings.market.index_symbol, 260))
+            regime = market_regime(self.prices.daily(self.settings.market.index_symbol, 260))
+            self.monitor.ok("notowania indeksu")
+            return regime
         except Exception as e:  # noqa: BLE001
+            self.monitor.fail("notowania indeksu", e)
             log.warning("Brak danych indeksu (%s) – reżim NEUTRAL", e)
             return Regime.NEUTRAL
 
@@ -327,6 +357,12 @@ class App:
                     continue
             self.db.record_outcome(s.id, out.status, today, self.clock() if out.closed else None,
                                    out.reason, out.result_r, out.result_pct)
+
+    def daily_report(self) -> None:
+        """Raport dnia na czat admina (bez czatu: do logów)."""
+        day = self.today().isoformat()
+        report = next((r for r in self.db.daily_report(limit=1) if r["day"] == day), None)
+        self.monitor.send(format_daily_report(day, report, self.signals_today()))
 
     def weekly_summary(self) -> bool:
         """Podsumowanie sygnałów zamkniętych w ostatnich 7 dniach. False = nie było czego wysłać."""

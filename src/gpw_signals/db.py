@@ -51,7 +51,9 @@ class Database:
     def __init__(self, path: str | Path):
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.conn = sqlite3.connect(str(path))
+        # Zadania schedulera działają w jego wątku, a połączenie powstaje w głównym. Dostęp jest
+        # szeregowy: scheduler ma jeden wątek roboczy (scheduler.make_scheduler).
+        self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.conn.row_factory = sqlite3.Row
         self._migrate()
         self.conn.executescript(SCHEMA)

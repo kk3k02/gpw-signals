@@ -38,6 +38,13 @@ python -m gpw_signals stats
 python -m gpw_signals usage                # newsy wg etapu, tokeny i szacowany koszt LLM na dzień
 ```
 
+## Monitoring
+
+- **Alerty:** po kilku awariach z rzędu (źródło, agent, notowania, cykl) i od razu przy błędzie publikacji, importu notowań lub trackera. Jeden alert na awarię i jeden po powrocie. Wymaga `TELEGRAM_ADMIN_CHAT_ID` w `.env`; bez niego alerty trafiają do logów.
+- **Raport dzienny** na ten sam czat: newsy, odrzucenia wg powodu, sygnały, tokeny i koszt.
+- **Healthcheck:** `python -m gpw_signals health` sprawdza `data/heartbeat`. Docker oznaczy kontener jako `unhealthy`, ale sam go nie zrestartuje.
+- **Logi:** `data/logs/` z rotacją (tylko `run`), opcjonalnie JSON (`logging.json_format`).
+
 ## Do zrobienia przed produkcją
 
 - **Dane cenowe:** domyślnie darmowe notowania dzienne z [archiwum GPW](https://www.gpw.pl/archiwum-notowan), importowane do `data/prices/` (`fetch-prices`, a w trybie `run` codziennie o `schedule.prices_at`). Surowe pliki są w cache `data/raw/gpw/`, więc po dopisaniu spółek do `gpw_tickers.csv` ponowny import nie pobiera nic z sieci. Ograniczenia:

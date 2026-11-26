@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import sys
-from datetime import date
+from datetime import date, timedelta
 
+from .clock import utc_now
 from .config import load_settings
+from .monitor import heartbeat_problem, setup_logging
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -32,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--provider", choices=["anthropic", "ollama"])
     ev.add_argument("--model")
     sub.add_parser("usage", help="Newsy wg etapu, tokeny i koszt LLM na dzień")
+    sub.add_parser("health", help="Kod wyjścia 1, gdy bot nie kończy cykli (healthcheck)")
     sub.add_parser("stats", help="Statystyki skuteczności")
     bt = sub.add_parser("backtest", help="Backtest silnika poziomów na historii notowań")
     bt.add_argument("tickers", nargs="+")
@@ -40,9 +42,10 @@ def main(argv: list[str] | None = None) -> int:
     pv.add_argument("ticker")
     args = p.parse_args(argv)
 
-    logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     s = load_settings(args.config)
+    if args.cmd == "health":  # bez App: healthcheck ma być lekki i niezależny od tokenów
+        return _health(s)
+    setup_logging(s.logging, args.verbose, to_file=args.cmd == "run")
 
     # Importy leniwe – szybszy start i brak zależności od klucza API tam, gdzie niepotrzebny
     from .pipeline import App
@@ -82,6 +85,13 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _preview(app, args.ticker)
     return 0
+
+
+def _health(s) -> int:
+    m = s.monitoring
+    problem = heartbeat_problem(m.heartbeat_file, utc_now(), timedelta(minutes=m.max_heartbeat_age_min))
+    print(problem or "OK")
+    return 1 if problem else 0
 
 
 def _build_tickers(s, sessions: int = 20) -> None:
@@ -141,7 +151,6 @@ def _update_ticks(s) -> None:
 
 
 def _preview(app, ticker: str) -> None:
-    from .clock import utc_now
     from .levels.engine import compute_levels
     from .levels.validate import validate_levels
     from .market.indicators import snapshot
