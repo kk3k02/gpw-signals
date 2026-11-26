@@ -1,0 +1,26 @@
+# Dni bez sesji GPW (dni robocze; weekendy pomija scheduler). Rok -> lista dat YYYY-MM-DD.
+# Wyliczone z polskich dni ustawowo wolnych (w tym Wigilia od 2025 r.) i praktyki GPW (31.12 bez sesji);
+# święta wypadające w weekend pominięte. ZWERYFIKUJ z oficjalnym kalendarzem: https://www.gpw.pl/szczegoly-sesji
+# Kolejny rok dopisz po publikacji kalendarza – od grudnia bot zgłosi brak w logu.
+2026:
+  - "2026-01-01"   # Nowy Rok
+  - "2026-01-06"   # Trzech Króli
+  - "2026-04-03"   # Wielki Piątek
+  - "2026-04-06"   # Poniedziałek Wielkanocny
+  - "2026-05-01"   # Święto Pracy
+  - "2026-06-04"   # Boże Ciało
+  - "2026-11-11"   # Święto Niepodległości
+  - "2026-12-24"   # Wigilia
+  - "2026-12-25"   # Boże Narodzenie
+  - "2026-12-31"   # Sylwester (praktyka GPW)
+2027:
+  - "2027-01-01"   # Nowy Rok
+  - "2027-01-06"   # Trzech Króli
+  - "2027-03-26"   # Wielki Piątek
+  - "2027-03-29"   # Poniedziałek Wielkanocny
+  - "2027-05-03"   # Święto Konstytucji 3 Maja
+  - "2027-05-27"   # Boże Ciało
+  - "2027-11-01"   # Wszystkich Świętych
+  - "2027-11-11"   # Święto Niepodległości
+  - "2027-12-24"   # Wigilia
+  - "2027-12-31"   # Sylwester (praktyka GPW)
