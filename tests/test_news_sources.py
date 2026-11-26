@@ -80,7 +80,7 @@ def test_settings_have_no_dead_broker_feed():
     s = load_settings()
     urls = [f.url for f in s.sources.rss]
     assert not any("rekomendacje.xml" in u for u in urls)
-    assert not s.sources.fetch_espi_body       # włączane świadomie, po sprawdzeniu regulaminu
+    assert not s.sources.fetch_espi_body       # domyślnie wyłączone
 
 
 def test_gpw_komunikaty_feed_parsed_offline():

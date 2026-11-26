@@ -15,7 +15,7 @@ schedule:
 
 sources:
   # Każdy feed: name, kind (espi|portal|broker|macro), url, priority (wyżej = ważniejszy).
-  # URL-e są przykładowe – ZWERYFIKUJ je i regulaminy serwisów przed użyciem.
+  # URL-e są przykładowe – ZWERYFIKUJ je przed użyciem.
   rss:
     - {name: bankier-espi, kind: espi, priority: 3, url: "https://www.bankier.pl/rss/espi.xml"}
     - {name: bankier-wiadomosci, kind: portal, priority: 1, url: "https://www.bankier.pl/rss/wiadomosci.xml"}
@@ -23,17 +23,15 @@ sources:
     # Zamiast niego feed giełdowy: rekomendacje DM wyłapują z niego broker_keywords poniżej.
     - {name: bankier-gielda, kind: portal, priority: 2, url: "https://www.bankier.pl/rss/gielda.xml"}
     # Komunikaty GPW (zawieszenia, dywidendy, zmiany notowań) dla wszystkich spółek – oficjalny RSS
-    # z gpw.pl/_rss; robots.txt nie blokuje, zastrzeżenia prawne nie zabraniają (docs/news_sources.md).
+    # z gpw.pl/_rss (docs/news_sources.md).
     - {name: gpw-komunikaty, kind: portal, priority: 2, enabled: false, url: "https://www.gpw.pl/rss_komunikaty"}
   # Po tych rdzeniach news z portalu traktujemy jako rekomendację DM (wszystkie rdzenie frazy muszą wystąpić)
   broker_keywords: ["rekomendac", "cen docelow", "kupuj", "akumuluj"]
   # Kalendarz makro/wyników – ręcznie lub z pliku (YYYY-MM-DD: opis)
   macro_calendar_file: data/macro_calendar.yaml
   # Terminy raportów okresowych z komunikatów ESPI: pobiera stronę komunikatu i zapisuje daty do pliku.
-  # Wyłączone, dopóki nie sprawdzisz regulaminu serwisu, z którego pochodzi feed ESPI (#7).
   fetch_report_schedules: false
-  # Pełna treść komunikatu ESPI ze strony, gdy RSS ma tylko tytuł lub spis treści (#7). robots.txt
-  # bankier.pl nie blokuje /wiadomosc/, ale włącz dopiero po sprawdzeniu regulaminu serwisu.
+  # Pełna treść komunikatu ESPI ze strony, gdy RSS ma tylko tytuł lub spis treści (#7).
   fetch_espi_body: false
   max_body_fetches: 10           # limit pobrań stron na cykl
   report_calendar_file: data/report_calendar.yaml
@@ -129,7 +127,7 @@ publish:
     Sygnał wygenerowany automatycznie. Inwestowanie wiąże się z ryzykiem utraty kapitału.
   # Link do opisu metodologii (#16) – np. adres opublikowanego docs/METODOLOGIA.md; pusty = bez linku
   methodology_url: ""
-  # Ujawnianie konfliktów interesów: tickery spółek, w których autor ma pozycję
+  # Spółki, w których masz pozycję – sygnał dostaje dopisek conflict_note
   conflict_tickers: []
   conflict_note: "Ujawnienie: autor kanału posiada pozycję w akcjach tej spółki."
 
