@@ -25,6 +25,7 @@ class FeedConfig(BaseModel):
     kind: str  # espi | portal | broker | macro
     url: str
     priority: int = 1
+    enabled: bool = True  # nowe źródła domyślnie wyłączone w settings.yaml (#7)
 
 
 class SourcesConfig(BaseModel):

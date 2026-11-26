@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- generator="FeedCreator 1.7.2" -->
+<rss version="2.0">
+    <channel>
+        <title>Komunikaty GPW</title>
+        <description><![CDATA[Witamy w kanale RSS GPW]]></description>
+        <link>http://www.gpw.pl</link>
+        <lastBuildDate>Thu, 26 Nov 2026 23:38:10 +0100</lastBuildDate>
+        <generator>FeedCreator 1.7.2</generator>
+        <item>
+            <title>ASBIS Enterprises PLC (Komunikat)</title>
+            <link>https://www.gpw.pl/komunikaty-gpw?ph_main_01_start=show&amp;cmn_id=119319</link>
+            <description><![CDATA[W związku z informacją ASBIS Enterprises PLC ( ASBIS ), o podjęciu w dniu 4 listopada 2026 r. przez Zarząd Spółki Decyzji o wypłacie zaliczki na poczet dywidendy przewidywanej z zysku Spółki za rok finansowy 2025/2026, Giełda Papierów Wartościowych w Warszawie S.A. informuje, że zgodnie z przepisami § 91 Działu IV Szczegółowych Zasad Obrotu Giełdowego w systemie WATS, na sesję giełdową w dniu 13 listopada 2026 r.]]></description>
+            <category>Komunikaty</category>
+            <pubDate>Thu, 12 Nov 2026 16:43:46 +0100</pubDate>
+        </item>
+<item>
+            <title>WISE FINANCE S.A. (Komunikat)</title>
+            <link>https://www.gpw.pl/komunikaty-gpw?ph_main_01_start=show&amp;cmn_id=119323</link>
+            <description><![CDATA[Giełda Papierów Wartościowych w Warszawie S.A. informuje, że począwszy od dnia 13 listopada 2026 r. akcje spółki WISE FINANCE S.A. (PLPLPGR00010) będą notowane pod nazwą skróconą „WISEFIN” i oznaczeniem „WFI”.]]></description>
+            <category>Komunikaty</category>
+            <pubDate>Tue, 10 Nov 2026 17:24:44 +0100</pubDate>
+        </item>
+    </channel>
+</rss>
