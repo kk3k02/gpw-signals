@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 
 import pandas as pd
 
-from gpw_signals.config import FiltersConfig, LevelsConfig, Settings
+from gpw_signals.config import FiltersConfig, LevelsConfig, Settings, SimulationConfig
 from gpw_signals.mapping import TickerMap
 from gpw_signals.models import Assessment, NewsItem, SourceKind
 from gpw_signals.news_backtest import AsOfPrices, backtest_news, load_news
@@ -35,7 +35,8 @@ def _settings():
     return Settings(levels=LevelsConfig(resistance_snap_r=0.0),
                     filters=FiltersConfig(min_avg_turnover_pln=0, min_rr_t1=0.0, require_above_sma50=False,
                                           block_bear_regime=False, min_volume_ratio=0, max_gap_pct=100,
-                                          min_score=0.0, cooldown_days=0))
+                                          min_score=0.0, cooldown_days=0),
+                    simulation=SimulationConfig(enabled=False))
 
 
 def _news(ts, title="ORLEN zawarł istotną umowę", kind=SourceKind.ESPI, source="espi"):

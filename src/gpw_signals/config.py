@@ -115,6 +115,16 @@ class FiltersConfig(BaseModel):
     min_score: float = 0.55
 
 
+class SimulationConfig(BaseModel):
+    """Monte Carlo przed publikacją: sygnał idzie tylko, gdy szansa celu przed SL >= min_probability."""
+    enabled: bool = True
+    n_paths: int = 10_000
+    min_probability: float = 0.70
+    target: int = 1                    # 1 = T1, 2 = T2, 3 = T3
+    lookback_days: int = 250           # z ilu sesji losujemy świece
+    seed: int | None = None
+
+
 class ProcessingConfig(BaseModel):
     max_news_age_hours: float = 12.0   # starsze nieprzetworzone newsy uznajemy za nieaktualne
     max_attempts: int = 3              # ile razy ponawiać news po błędzie przejściowym
@@ -175,6 +185,7 @@ class Settings(BaseModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     levels: LevelsConfig = Field(default_factory=LevelsConfig)
     filters: FiltersConfig = Field(default_factory=FiltersConfig)
+    simulation: SimulationConfig = Field(default_factory=SimulationConfig)
     processing: ProcessingConfig = Field(default_factory=ProcessingConfig)
     prefilter: PrefilterConfig = Field(default_factory=PrefilterConfig)
     tracker: TrackerConfig = Field(default_factory=TrackerConfig)

@@ -35,6 +35,7 @@ from .prefilter import noise_reason
 from .publish.formatter import conflict_note_for, format_outcome, format_signal, format_weekly_summary
 from .publish.telegram import DryRunPublisher, Publisher, TelegramPublisher
 from .scoring import pre_agent_check, score_signal
+from .simulation import simulate_target_first
 from .tracker.outcomes import evaluate
 from .tracker.stats import summarize
 
@@ -295,6 +296,22 @@ class App:
             self.cycle_stats["po_llm:odrzucony"] += 1
             return None, f"{ticker}: odrzucony – {'; '.join(sr.rejections)}"
 
+        mc = self.settings.simulation
+        sim_note = ""
+        if mc.enabled:
+            try:
+                sim = simulate_target_first(df, lr.levels, a.horizon_days, target_index=mc.target - 1,
+                                            n_paths=mc.n_paths, lookback_days=mc.lookback_days, seed=mc.seed)
+            except ValueError as e:
+                self.cycle_stats["po_llm:symulacja"] += 1
+                return None, f"{ticker}: symulacja – {e}"
+            sim_note = f", T{mc.target} przed SL {sim.probability:.0%} z {sim.n_paths} symulacji"
+            if sim.probability < mc.min_probability:
+                log.info("%s odrzucony przez symulację: %.1f%%", ticker, sim.probability * 100)
+                self.cycle_stats["po_llm:symulacja"] += 1
+                return None, (f"{ticker}: symulacja – szansa T{mc.target} przed SL {sim.probability:.0%}"
+                              f" < {mc.min_probability:.0%}")
+
         # #2: najpierw zapis (status pending_publish), dopiero potem wysyłka. Dzięki temu sygnał
         # od razu blokuje cooldown, a nieudana wysyłka jest ponawiana z bazy, nie przez ponowną ocenę newsa.
         sig = Signal(ticker=ticker, company_name=company.name, levels=lr.levels, score=sr.score,
@@ -303,8 +320,8 @@ class App:
         self.db.insert_signal(sig)
         self.cycle_stats["sygnał"] += 1
         if self._publish(sig):
-            return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}, kurs {snap.price_source})"
-        return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}) – publikacja do ponowienia"
+            return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}, kurs {snap.price_source}{sim_note})"
+        return sig, f"{ticker}: SYGNAŁ score={sr.score:.2f} ({phase.value}{sim_note}) – publikacja do ponowienia"
 
     def _live_price(self, symbol: str) -> float | None:
         """Bieżący kurs tylko w trakcie sesji i tylko świeży; inaczej None = świece dzienne (#4).

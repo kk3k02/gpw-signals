@@ -32,7 +32,7 @@ sources:
   # Terminy raportów okresowych z komunikatów ESPI: pobiera stronę komunikatu i zapisuje daty do pliku.
   fetch_report_schedules: false
   # Pełna treść komunikatu ESPI ze strony, gdy RSS ma tylko tytuł lub spis treści (#7).
-  fetch_espi_body: false
+  fetch_espi_body: true
   max_body_fetches: 10           # limit pobrań stron na cykl
   report_calendar_file: data/report_calendar.yaml
 
@@ -55,15 +55,15 @@ market:
   index_symbol: "wig20"
 
 agent:
-  provider: anthropic            # anthropic | ollama (lokalny model, bez kosztów API)
-  model: claude-opus-5-5         # dla ollama np. SpeakLeash/bielik-11b-v3.0-instruct:<tag>
+  provider: ollama               # anthropic | ollama (lokalny model, bez kosztów API)
+  model: qwen2.5:3b              # dla ollama np. SpeakLeash/bielik-11b-v3.0-instruct:<tag>
   effort: high                   # low | medium | high | xhigh | max
   max_tokens: 16000
   max_tool_rounds: 8
   use_fallbacks: true            # serwerowy fallback przy odmowie modelu
   base_url: "http://localhost:11434"  # poniżej tylko dla ollama
-  num_ctx: 8192
-  timeout_s: 300
+  num_ctx: 4096
+  timeout_s: 900
 
 levels:
   atr_period: 14
@@ -88,6 +88,13 @@ filters:
   cooldown_days: 5               # max 1 aktywny sygnał na spółkę w tym okresie
   max_signals_per_day: 5
   min_score: 0.55
+
+simulation:
+  enabled: true                  # Monte Carlo przed wysyłką: losowane ścieżki z historii spółki
+  n_paths: 10000
+  min_probability: 0.70          # wysyłka tylko przy szansie celu przed SL >= 70%
+  target: 1                      # 1 = T1, 2 = T2, 3 = T3
+  lookback_days: 250
 
 processing:
   max_news_age_hours: 12         # starsze newsy odrzucane przy pobraniu; w kolejce -> "nieaktualny"
