@@ -7,7 +7,7 @@ import pytest
 
 from gpw_signals.agent.assess import AgentError
 from gpw_signals.clock import to_iso, utc_now
-from gpw_signals.config import FiltersConfig, LevelsConfig, ProcessingConfig, PublishConfig, Settings
+from gpw_signals.config import FiltersConfig, LevelsConfig, ProcessingConfig, PublishConfig, Settings, SimulationConfig
 from gpw_signals.db import Database
 from gpw_signals.ingest.macro import EventCalendar
 from gpw_signals.mapping import TickerMap
@@ -78,6 +78,7 @@ def _settings():
                               block_bear_regime=False, min_volume_ratio=0, max_gap_pct=100, min_score=0.0),
         processing=ProcessingConfig(max_news_age_hours=12, max_attempts=3),
         publish=PublishConfig(max_pending_minutes=60, disclaimer=""),
+        simulation=SimulationConfig(enabled=False),
     )
 
 
@@ -380,3 +381,11 @@ def test_live_price_only_in_session_and_fresh(make_app):
     assert app._live_price("x") is None
     app.clock = lambda: datetime(2026, 11, 25, 13, 0, tzinfo=pl)  # kurs nieświeży: fallback
     assert app._live_price("x") is None
+
+
+def test_simulation_below_threshold_blocks_signal(make_app):
+    n = _news()
+    app = make_app([n])
+    app.settings.simulation = SimulationConfig(enabled=True, min_probability=1.01, seed=1)
+    assert app.run_once() == [] and app.publisher.sent == []
+    assert "symulacja" in _row(app, n)["decision"]
