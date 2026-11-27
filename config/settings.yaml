@@ -62,7 +62,7 @@ agent:
   max_tool_rounds: 8
   use_fallbacks: true            # serwerowy fallback przy odmowie modelu
   base_url: "http://localhost:11434"  # poniżej tylko dla ollama
-  num_ctx: 4096
+  num_ctx: 8192
   timeout_s: 900
 
 levels:
@@ -92,7 +92,7 @@ filters:
 simulation:
   enabled: true                  # Monte Carlo przed wysyłką: losowane ścieżki z historii spółki
   n_paths: 10000
-  min_probability: 0.70          # wysyłka tylko przy szansie celu przed SL >= 70%
+  min_probability: 0.50          # wysyłka tylko przy szansie celu przed SL >= 50%
   target: 1                      # 1 = T1, 2 = T2, 3 = T3
   lookback_days: 250
 
