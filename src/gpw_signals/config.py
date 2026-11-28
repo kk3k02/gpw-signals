@@ -168,6 +168,7 @@ class MonitoringConfig(BaseModel):
     max_heartbeat_age_min: int = 30    # starszy znacznik = kontener "unhealthy"
     daily_report: bool = True
     daily_report_at: str = "19:15"     # po trackerze
+    daily_report_to_channel: bool = False  # raport także na kanał sygnałów (testowy lub główny)
 
 
 class LoggingConfig(BaseModel):

@@ -140,6 +140,17 @@ def test_daily_report_is_sent_to_admin(tmp_path):
     assert "Nowe newsy: 7, wywołania LLM: 2" in sent[1] and "szum: 4" in sent[1]
 
 
+def test_daily_report_also_goes_to_channel_when_enabled(tmp_path):
+    app, sent = _app(tmp_path)
+    channel = []
+    app.publisher = SimpleNamespace(send=lambda text, reply_to=None: channel.append(text))
+    app.daily_report()
+    assert len(sent) == 1 and channel == []          # domyślnie tylko admin / logi
+    app.settings.monitoring.daily_report_to_channel = True
+    app.daily_report()
+    assert len(sent) == 2 and channel == [sent[1]] and "Raport 2026-11-25" in channel[0]
+
+
 def test_report_with_unknown_model_cost():
     rep = {"stages": {}, "cost_usd": None,
            "models": {"x": {"requests": 1, "input": 5, "output": 2, "cache_read": 0, "cache_write": 0}}}
