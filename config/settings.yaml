@@ -121,6 +121,7 @@ monitoring:                      # alerty idą na TELEGRAM_ADMIN_CHAT_ID z .env 
   max_heartbeat_age_min: 30
   daily_report: true
   daily_report_at: "19:15"       # po trackerze (schedule.tracker_at)
+  daily_report_to_channel: true  # raport także na kanał sygnałów (publish.use_test_channel wybiera który)
 
 logging:
   json_format: false             # true = jeden obiekt JSON na linię

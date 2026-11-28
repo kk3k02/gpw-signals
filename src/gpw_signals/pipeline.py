@@ -426,10 +426,13 @@ class App:
                                    out.reason, out.result_r, out.result_pct)
 
     def daily_report(self) -> None:
-        """Raport dnia na czat admina (bez czatu: do logów)."""
+        """Raport dnia na czat admina (bez czatu: do logów), opcjonalnie także na kanał sygnałów."""
         day = self.today().isoformat()
         report = next((r for r in self.db.daily_report(limit=1) if r["day"] == day), None)
-        self.monitor.send(format_daily_report(day, report, self.signals_today()))
+        text = format_daily_report(day, report, self.signals_today())
+        self.monitor.send(text)
+        if self.settings.monitoring.daily_report_to_channel:
+            self.publisher.send(text)   # błąd wysyłki -> alert "raport dzienny" w schedulerze
 
     def weekly_summary(self) -> bool:
         """Podsumowanie sygnałów zamkniętych w ostatnich 7 dniach. False = nie było czego wysłać."""

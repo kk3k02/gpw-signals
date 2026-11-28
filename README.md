@@ -41,7 +41,7 @@ python -m gpw_signals usage                # newsy wg etapu, tokeny i szacowany 
 ## Monitoring
 
 - **Alerty:** po kilku awariach z rzędu (źródło, agent, notowania, cykl) i od razu przy błędzie publikacji, importu notowań lub trackera. Jeden alert na awarię i jeden po powrocie. Wymaga `TELEGRAM_ADMIN_CHAT_ID` w `.env`; bez niego alerty trafiają do logów.
-- **Raport dzienny** na ten sam czat: newsy, odrzucenia wg powodu, sygnały, tokeny i koszt.
+- **Raport dzienny** na ten sam czat: newsy, odrzucenia wg powodu, sygnały, tokeny i koszt. Z `monitoring.daily_report_to_channel: true` także na kanał sygnałów.
 - **Healthcheck:** `python -m gpw_signals health` sprawdza `data/heartbeat`. Docker oznaczy kontener jako `unhealthy`, ale sam go nie zrestartuje.
 - **Logi:** `data/logs/` z rotacją (tylko `run`), opcjonalnie JSON (`logging.json_format`).
 
