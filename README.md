@@ -62,13 +62,26 @@ python -m gpw_signals usage                # newsy wg etapu, tokeny i szacowany 
 
 ## Uruchomienie w Dockerze
 
-1. Uzupełnij `.env` (na podstawie `.env.example`).
-2. Zbuduj i uruchom bota w tle:
+1. Uzupełnij `.env` (na podstawie `.env.example`), także `TELEGRAM_ADMIN_CHAT_ID`, żeby dostawać alerty i raport dzienny.
+2. Zatrzymaj bota uruchomionego lokalnie (`python -m gpw_signals run`). Dwa procesy na tej samej bazie
+   w `data/` publikowałyby te same sygnały dwa razy.
+3. Zbuduj i uruchom bota w tle z katalogu, w którym są `.env` i `data/` (główny checkout, nie worktree):
 
    ```bash
    docker compose up -d --build
    docker compose logs -f
    ```
+
+   Po starcie na czat admina przychodzi „🟢 Bot uruchomiony” z modelem i kanałem.
+
+Na Windows:
+
+- **Docker Desktop:** włącz *Settings → General → Start Docker Desktop when you sign in*. Kontener
+  (`restart: unless-stopped`) wstaje razem z Dockerem, czyli dopiero po zalogowaniu do Windows.
+  Komputer musi być włączony i nieuśpiony w godzinach `schedule.active_from`–`monitoring.daily_report_at`.
+- **Ollama** działa na hoście, a kontener łączy się z nią przez `OLLAMA_BASE_URL`
+  (`http://host.docker.internal:11434` w `docker-compose.yml`, nadpisuje `agent.base_url`).
+  Gdy kontener jej nie widzi, ustaw w Windows zmienną `OLLAMA_HOST=0.0.0.0` i zrestartuj Ollamę.
 
 `config/` (tylko do odczytu) i `data/` (baza SQLite, notowania) są montowane z hosta, więc dane przetrwają przebudowę obrazu.
 Pozostałe komendy CLI uruchamiasz w kontenerze, np.:

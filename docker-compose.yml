@@ -7,6 +7,10 @@ services:
     env_file: .env
     environment:
       TZ: Europe/Warsaw
+      # Ollama na hoście (agent.provider: ollama); localhost z settings.yaml to w kontenerze sam kontener
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+    extra_hosts:                # host.docker.internal także poza Docker Desktop (Linux)
+      - "host.docker.internal:host-gateway"
     healthcheck:                # znacznik ostatniego udanego cyklu (monitoring.heartbeat_file)
       test: ["CMD", "python", "-m", "gpw_signals", "health"]
       interval: 5m

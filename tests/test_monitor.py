@@ -241,3 +241,25 @@ def test_no_log_file_outside_run(tmp_path, restore_logging):
     f = tmp_path / "bot.log"
     setup_logging(LoggingConfig(file=str(f)))
     assert not f.exists()
+
+
+# ------------------------------------------------------------------ start w Dockerze
+
+def test_ollama_base_url_from_env_overrides_yaml(monkeypatch):
+    from gpw_signals.config import load_settings
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    assert load_settings("config/settings.yaml").agent.base_url == "http://localhost:11434"
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
+    assert load_settings("config/settings.yaml").agent.base_url == "http://host.docker.internal:11434"
+
+
+def test_startup_message_names_model_and_channel(tmp_path):
+    from gpw_signals.scheduler import startup_message
+    app, sent = _app(tmp_path)
+    app.settings.agent.provider, app.settings.agent.model = "ollama", "qwen2.5:3b"
+    app.monitor.send(startup_message(app))
+    assert sent == ["🟢 Bot uruchomiony\nModel: ollama/qwen2.5:3b\nKanał sygnałów: testowy"]
+    app.settings.publish.use_test_channel = False
+    assert "główny" in startup_message(app)
+    app.settings.publish.enabled = False
+    assert "wyłączony" in startup_message(app)

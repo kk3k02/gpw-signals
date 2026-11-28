@@ -1,6 +1,7 @@
 """Konfiguracja: progi i parametry z settings.yaml, sekrety z .env / zmiennych środowiskowych."""
 from __future__ import annotations
 
+import os
 from datetime import date
 from pathlib import Path
 from typing import Literal
@@ -201,6 +202,9 @@ def load_settings(path: str | Path = "config/settings.yaml") -> Settings:
     p = Path(path)
     data = yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else {}
     s = Settings(**(data or {}), secrets=Secrets())
+    # Adres Ollamy zależy od miejsca uruchomienia (host vs kontener), a config/ w Dockerze jest tylko do odczytu
+    if url := os.environ.get("OLLAMA_BASE_URL", "").strip():
+        s.agent.base_url = url
     if s.schedule.holidays_file:
         s.schedule.holidays = sorted(set(s.schedule.holidays) | set(load_holidays(s.schedule.holidays_file)))
     return s
