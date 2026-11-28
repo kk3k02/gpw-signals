@@ -18,6 +18,7 @@ from .config import Settings
 from .db import Database
 from .ingest.base import Source, fetch_all
 from .ingest.macro import EventCalendar
+from .ingest.money_espi import MoneyEspiSource
 from .ingest.report_schedule import ReportCalendar, ScheduleError, extract_body, fetch_page, is_report_schedule
 from .ingest.rss_portals import RssSource, needs_body
 from .levels.engine import compute_levels
@@ -94,8 +95,9 @@ class App:
         prices = make_provider(m.provider, m.stooq_url, m.csv_dir)
         calendar = EventCalendar(settings.sources.macro_calendar_file, ZoneInfo(settings.timezone),
                                  extra=[settings.sources.report_calendar_file])
-        sources: list[Source] = [RssSource(f, settings.sources.broker_keywords) for f in settings.sources.rss
-                                   if f.enabled]
+        sources: list[Source] = [MoneyEspiSource(f) if f.format == "money"
+                                   else RssSource(f, settings.sources.broker_keywords)
+                                   for f in settings.sources.rss if f.enabled]
         sec = settings.secrets
         if dry_run or not settings.publish.enabled:
             publisher: Publisher = DryRunPublisher()
@@ -131,7 +133,7 @@ class App:
             if self._wants_body(n) and body_fetches < self.settings.sources.max_body_fetches:
                 body_fetches += 1
                 self._fill_body(n)
-            n.tickers = self.tickers.map_news(n.title, n.summary, n.kind)
+            n.tickers = self.tickers.map_news(n.title, n.summary, n.kind, n.isin)
             new += self.db.insert_news_if_new(n)
         if new:
             self.cycle_stats["news:nowe"] = new

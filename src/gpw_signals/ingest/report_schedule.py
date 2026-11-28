@@ -15,6 +15,7 @@ import httpx
 import yaml
 
 from .macro import EventCalendar
+from .money_espi import extract_body as money_body
 
 _TITLE = re.compile(
     r"(termin\w*|kalendarz\w*|harmonogram\w*)\b.{0,60}\b(raport\w*|sprawozda\w*)\b.{0,20}\bokresow\w*", re.IGNORECASE)
@@ -52,7 +53,7 @@ def extract_body(page: str) -> str:
     """Polska treść raportu ze strony komunikatu ('' gdy jej nie ma)."""
     text = html.unescape(_TAG.sub(" ", _SKIP.sub(" ", page))).replace("\xa0", " ")
     m = _BODY.search(text)
-    return re.sub(r"\s+", " ", m.group(1)).strip() if m else ""
+    return re.sub(r"\s+", " ", m.group(1)).strip() if m else money_body(page)
 
 
 def _to_date(m: re.Match) -> date | None:

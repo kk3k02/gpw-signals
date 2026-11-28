@@ -26,6 +26,7 @@ class FeedConfig(BaseModel):
     url: str
     priority: int = 1
     enabled: bool = True  # nowe źródła domyślnie wyłączone w settings.yaml (#7)
+    format: Literal["rss", "money"] = "rss"  # money = lista komunikatów money.pl (ingest/money_espi.py)
 
 
 class SourcesConfig(BaseModel):
