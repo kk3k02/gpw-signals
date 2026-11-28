@@ -64,6 +64,15 @@ def poll_tick(app: App, now: datetime) -> None:
         log.warning("Znacznik życia niezapisany: %s", e)
 
 
+def startup_message(app: App) -> str:
+    """Komunikat na czat admina po starcie: od razu widać, że Telegram działa i z jakim modelem."""
+    s = app.settings
+    channel = "testowy" if s.publish.use_test_channel else "główny"
+    if not s.publish.enabled:
+        channel = "wyłączony (publish.enabled: false)"
+    return f"🟢 Bot uruchomiony\nModel: {s.agent.provider}/{s.agent.model}\nKanał sygnałów: {channel}"
+
+
 def run_forever(app: App) -> None:
     s = app.settings
     tz = ZoneInfo(s.timezone)
@@ -105,4 +114,5 @@ def run_forever(app: App) -> None:
         sched.add_job(weekly, "cron", day_of_week=s.tracker.weekly_summary_day, hour=int(wh), minute=int(wm))
     log.info("Start schedulera (co %d min, %s–%s)", s.schedule.poll_minutes,
              s.schedule.active_from, s.schedule.active_to)
+    app.monitor.send(startup_message(app))
     sched.start()

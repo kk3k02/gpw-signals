@@ -8,7 +8,7 @@ COPY src ./src
 RUN pip install --no-cache-dir .
 
 COPY config ./config
-COPY data/gpw_tickers.csv data/macro_calendar.yaml ./data/
+COPY data/gpw_tickers.csv data/macro_calendar.yaml data/gpw_holidays.yaml ./data/
 
 # Użytkownik bez uprawnień roota; /app/data montowane jako wolumen (baza, notowania)
 RUN useradd --create-home --uid 1000 bot && mkdir -p data/prices data/raw && chown -R bot:bot /app
