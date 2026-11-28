@@ -72,6 +72,7 @@ class OllamaAssessor:
         try:
             r = self.client.post(f"{self.cfg.base_url.rstrip('/')}/api/chat", json={
                 "model": self.cfg.model, "stream": False, "format": ASSESSMENT_SCHEMA,
+                "think": False,  # qwen3 i inne modele "myślące": bez rozumowania, sam JSON
                 "messages": [{"role": "system", "content": LOCAL_SYSTEM_PROMPT}, {"role": "user", "content": user}],
                 "options": {"temperature": 0, "num_ctx": self.cfg.num_ctx,
                             "num_predict": min(self.cfg.max_tokens, self.cfg.num_ctx // 2)}})
