@@ -146,14 +146,17 @@ class TickerMap:
         norm = normalize(text)
         return [c.ticker for c in self.companies.values() if c.mentioned_in(text, norm)]
 
-    def map_news(self, title: str, summary: str, kind: SourceKind) -> list[str]:
+    def map_news(self, title: str, summary: str, kind: SourceKind, isin: str = "") -> list[str]:
         """Tickery dla newsa.
 
+        - ISIN podany przez źródło (money.pl): spółka o tym ISIN-ie,
         - ESPI: wyłącznie emitent z tytułu,
         - pozostałe: tylko spółki z TYTUŁU. Lead często wymienia spółki poboczne ("do ataku odniosły
           się m.in. BNP Paribas i Bank Pekao"), a każde takie trafienie to zbędne wywołanie LLM albo
           sygnał na spółce, której news nie dotyczy. Lead i tak trafia do agenta jako kontekst.
         """
+        if isin and (c := self.by_isin().get(isin)):
+            return [c.ticker]
         if kind == SourceKind.ESPI:
             issuer = espi_issuer(title)
             if issuer is not None:

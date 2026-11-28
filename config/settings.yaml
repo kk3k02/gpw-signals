@@ -17,7 +17,9 @@ sources:
   # Każdy feed: name, kind (espi|portal|broker|macro), url, priority (wyżej = ważniejszy).
   # URL-e są przykładowe – ZWERYFIKUJ je przed użyciem.
   rss:
-    - {name: bankier-espi, kind: espi, priority: 3, url: "https://www.bankier.pl/rss/espi.xml"}
+    # Wyłączony: money-espi niżej ma te same raporty i wszystkie pozostałe; oba naraz = ten sam raport
+    # dwa razy oceniany przez LLM. Włącz, gdyby money.pl przestało działać.
+    - {name: bankier-espi, kind: espi, priority: 3, enabled: false, url: "https://www.bankier.pl/rss/espi.xml"}
     - {name: bankier-wiadomosci, kind: portal, priority: 1, url: "https://www.bankier.pl/rss/wiadomosci.xml"}
     # rss/rekomendacje.xml zwraca pusty dokument (sprawdzone 2026-11-26) i nie ma go na bankier.pl/rss.
     # Zamiast niego feed giełdowy: rekomendacje DM wyłapują z niego broker_keywords poniżej.
@@ -25,6 +27,9 @@ sources:
     # Komunikaty GPW (zawieszenia, dywidendy, zmiany notowań) dla wszystkich spółek – oficjalny RSS
     # z gpw.pl/_rss (docs/news_sources.md).
     - {name: gpw-komunikaty, kind: portal, priority: 2, enabled: false, url: "https://www.gpw.pl/rss_komunikaty"}
+    # Raporty ESPI/EBI WSZYSTKICH spółek (bankier-espi ma tylko wybrane). Strona HTML, nie RSS:
+    # 20 najnowszych komunikatów, mapowanie po ISIN (docs/news_sources.md).
+    - {name: money-espi, kind: espi, priority: 3, format: money, url: "https://www.money.pl/gielda/komunikaty/"}
   # Po tych rdzeniach news z portalu traktujemy jako rekomendację DM (wszystkie rdzenie frazy muszą wystąpić)
   broker_keywords: ["rekomendac", "cen docelow", "kupuj", "akumuluj"]
   # Kalendarz makro/wyników – ręcznie lub z pliku (YYYY-MM-DD: opis)

@@ -25,6 +25,7 @@ class NewsItem:
     summary: str = ""
     priority: int = 1
     tickers: list[str] = field(default_factory=list)
+    isin: str = ""       # ISIN emitenta, gdy źródło go podaje (money.pl) – pewne mapowanie
 
     @property
     def uid(self) -> str:
